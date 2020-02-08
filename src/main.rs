@@ -1,0 +1,179 @@
+extern crate glfw;
+extern crate gl;
+
+use glfw::{Context, Key, Action};
+use gl::types::*;
+
+use std::sync::mpsc::Receiver;
+use std::ffi::CString;
+use std::ptr;
+use std::str;
+use std::mem;
+use std::os::raw::c_void;
+use std::fs::File;
+use std::io::Read;
+
+struct Shader{
+    id: u32,
+}
+
+impl Shader{
+    pub fn new(vertexPath: &str, fragmentPath: &str) -> Shader{
+        let mut res = Shader{ id:0 };
+
+        let mut vertexShaderSourceFile = File::open(vertexPath).unwrap();
+        let mut fragmentShaderSourceFile = File::open(fragmentPath).unwrap();
+
+        let mut vertexShaderSource = String::new();
+        let mut fragmentShaderSource = String::new();
+        
+        vertexShaderSourceFile.read_to_string(&mut vertexShaderSource).unwrap();
+        fragmentShaderSourceFile.read_to_string(&mut fragmentShaderSource).unwrap();
+
+        let vertexShaderSource = CString::new(vertexShaderSource.as_bytes()).unwrap();
+        let fragmentShaderSource = CString::new(fragmentShaderSource.as_bytes()).unwrap();
+
+        unsafe {
+            let vertexShader = gl::CreateShader(gl::VERTEX_SHADER);
+            gl::ShaderSource(vertexShader, 1, &vertexShaderSource.as_ptr(), ptr::null());
+            gl::CompileShader(vertexShader);
+
+            let mut success = gl::FALSE as GLint;
+            let mut infoLog = Vec::with_capacity(512);
+            infoLog.set_len(512-1);
+            gl::GetShaderiv(vertexShader, gl::COMPILE_STATUS, &mut success);
+            if success != gl::TRUE as GLint {
+                gl::GetShaderInfoLog(vertexShader, 512, ptr::null_mut(), infoLog.as_mut_ptr() as *mut GLchar);
+                println!("{}", str::from_utf8_unchecked(&infoLog));
+            }
+
+            let fragmentShader = gl::CreateShader(gl::FRAGMENT_SHADER);
+            gl::ShaderSource(fragmentShader, 1, &fragmentShaderSource.as_ptr(), ptr::null());
+            gl::CompileShader(fragmentShader);
+
+            gl::GetShaderiv(fragmentShader, gl::COMPILE_STATUS, &mut success);
+            if success != gl::TRUE as GLint {
+                gl::GetShaderInfoLog(fragmentShader, 512, ptr::null_mut(), infoLog.as_mut_ptr() as *mut GLchar);
+                println!("{}", str::from_utf8_unchecked(&infoLog));
+            }
+
+            let shaderProgram = gl::CreateProgram();
+            gl::AttachShader(shaderProgram, vertexShader);
+            gl::AttachShader(shaderProgram, fragmentShader);
+            gl::LinkProgram(shaderProgram);
+
+            gl::DeleteShader(vertexShader);
+            gl::DeleteShader(fragmentShader);
+
+            res.id = shaderProgram;
+        }
+
+        res
+    }
+
+    pub fn useProgram(&self){
+        unsafe {
+            gl::UseProgram(self.id);
+        }
+    }
+
+    pub fn setUniform4f(&self, name: &str, vector: (f32, f32, f32, f32)){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::Uniform4f(gl::GetUniformLocation(self.id, name.as_ptr()), vector.0, vector.1, vector.2, vector.3,);
+        }
+    }
+}
+
+fn main(){
+    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+    glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
+    glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+
+    let (mut window, events) = glfw.create_window(800, 600, "Slugma", glfw::WindowMode::Windowed)
+        .expect("Failed to create glfw window");
+    
+    window.make_current();
+    window.set_key_polling(true);
+    window.set_framebuffer_size_polling(true);
+
+    gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
+
+    let (shaderProgram, VAO) = unsafe {
+
+        let vertices: [f32;24] = [
+            0.5, 0.5, 0.0, 1.0, 0.0, 0.0,
+            0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
+            -0.5, -0.5, 0.0, 0.0, 0.0, 1.0,
+            -0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+        ];
+        let indices = [
+            0, 1, 3,
+            1, 2, 3
+        ];
+
+        let (mut VBO, mut VAO, mut EBO) = (0, 0, 0);
+        gl::GenVertexArrays(1, &mut VAO);
+        gl::GenBuffers(1, &mut VBO);
+        gl::GenBuffers(1, &mut EBO);
+
+        gl::BindVertexArray(VAO);
+        
+        gl::BindBuffer(gl::ARRAY_BUFFER, VBO);
+        gl::BufferData(gl::ARRAY_BUFFER,
+                        (vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                        &vertices[0] as *const f32 as *const c_void,
+                        gl::STATIC_DRAW);
+        
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, EBO);
+        gl::BufferData(gl::ELEMENT_ARRAY_BUFFER,
+                      (indices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                      &indices[0] as *const i32 as *const c_void,
+                      gl::STATIC_DRAW);
+
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::EnableVertexAttribArray(0);
+        gl::EnableVertexAttribArray(1);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+
+        gl::BindVertexArray(0);
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
+
+        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO)
+
+    };
+
+
+    while !window.should_close() {
+
+        process_events(&mut window, &events);
+
+        unsafe {
+            gl::ClearColor(0.0, 0.5, 0.5, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+
+            shaderProgram.useProgram();
+            //let gltime = glfw.get_time() as f32;
+            //shaderProgram.setUniform4f("u_color", (0.0, gltime.sin().abs(), 0.0, 1.0));
+            gl::BindVertexArray(VAO);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
+        }
+
+        window.swap_buffers();
+        glfw.poll_events();
+    }
+}
+
+fn process_events(window: &mut glfw::Window, events: &Receiver<(f64, glfw::WindowEvent)>) {
+    for (_, event) in glfw::flush_messages(events) {
+        match event {
+            glfw::WindowEvent::FramebufferSize(width, height) => {
+                unsafe {gl::Viewport(0, 0, width, height);}
+            }
+            glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => window.set_should_close(true),
+            _ => {}
+        }
+    }
+}
