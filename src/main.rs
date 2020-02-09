@@ -4,6 +4,8 @@ extern crate gl;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
+use image::GenericImageView;
+
 use std::sync::mpsc::Receiver;
 use std::ffi::CString;
 use std::ptr;
@@ -12,6 +14,7 @@ use std::mem;
 use std::os::raw::c_void;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 struct Shader{
     id: u32,
@@ -83,6 +86,20 @@ impl Shader{
             gl::Uniform4f(gl::GetUniformLocation(self.id, name.as_ptr()), vector.0, vector.1, vector.2, vector.3,);
         }
     }
+
+    pub fn setInt(&self, name: &str, value: i32){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::Uniform1i(gl::GetUniformLocation(self.id, name.as_ptr()), value);
+        }
+    }
+    
+    pub fn setFloat(&self, name: &str, value: f32){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::Uniform1f(gl::GetUniformLocation(self.id, name.as_ptr()), value);
+        }
+    }
 }
 
 fn main(){
@@ -99,13 +116,13 @@ fn main(){
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
-    let (shaderProgram, VAO) = unsafe {
+    let (shaderProgram, VAO, texture0, texture1) = unsafe {
 
-        let vertices: [f32;24] = [
-            0.5, 0.5, 0.0, 1.0, 0.0, 0.0,
-            0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
-            -0.5, -0.5, 0.0, 0.0, 0.0, 1.0,
-            -0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+        let vertices: [f32;32] = [
+            0.5, 0.5, 0.0,  1.0, 0.0, 0.0,  1.0, 1.0,
+            0.5, -0.5, 0.0,  0.0, 1.0, 0.0,  1.0, 0.0,
+            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0,  0.0, 0.0,
+            -0.5, 0.5, 0.0,  0.0, 0.0, 0.0,  0.0, 1.0
         ];
         let indices = [
             0, 1, 3,
@@ -131,17 +148,68 @@ fn main(){
                       &indices[0] as *const i32 as *const c_void,
                       gl::STATIC_DRAW);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
-        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (6 * mem::size_of::<GLfloat>()) as *const c_void);
         gl::EnableVertexAttribArray(0);
         gl::EnableVertexAttribArray(1);
+        gl::EnableVertexAttribArray(2);
+
+        let mut texture0 = 0;
+        gl::GenTextures(1, &mut texture0);
+        gl::BindTexture(gl::TEXTURE_2D, texture0);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        let img = image::open(&Path::new("textures/container.jpg")).expect("Failed to load texture");
+        let data = img.raw_pixels();
+        gl::TexImage2D(gl::TEXTURE_2D,
+                        0,
+                        gl::RGB as i32,
+                        img.width() as i32,
+                        img.height() as i32,
+                        0,
+                        gl::RGB,
+                        gl::UNSIGNED_BYTE,
+                        &data[0] as *const u8 as *const c_void
+                    );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        let mut texture1 = 0;
+        gl::GenTextures(1, &mut texture1);
+        gl::BindTexture(gl::TEXTURE_2D, texture1);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        let img = image::open(&Path::new("textures/awesomeface.png")).expect("Failed to load texture");
+        let img = img.flipv();
+        let data = img.raw_pixels();
+        gl::TexImage2D(gl::TEXTURE_2D,
+                        0,
+                        gl::RGB as i32,
+                        img.width() as i32,
+                        img.height() as i32,
+                        0,
+                        gl::RGBA,
+                        gl::UNSIGNED_BYTE,
+                        &data[0] as *const u8 as *const c_void
+                    );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
 
         gl::BindVertexArray(0);
         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
 
-        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO)
+        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO, texture0, texture1)
 
     };
 
@@ -150,13 +218,22 @@ fn main(){
 
         process_events(&mut window, &events);
 
+        shaderProgram.useProgram();
+        shaderProgram.setInt("tex0", 0);
+        shaderProgram.setInt("tex1", 1);
+
         unsafe {
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindTexture(gl::TEXTURE_2D, texture0);
+            gl::ActiveTexture(gl::TEXTURE1);
+            gl::BindTexture(gl::TEXTURE_2D, texture1);
+
             shaderProgram.useProgram();
-            //let gltime = glfw.get_time() as f32;
-            //shaderProgram.setUniform4f("u_color", (0.0, gltime.sin().abs(), 0.0, 1.0));
+            let gltime = glfw.get_time() as f32;
+            shaderProgram.setFloat("u_mix_param", gltime.sin().abs());
             gl::BindVertexArray(VAO);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
