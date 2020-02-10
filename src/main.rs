@@ -4,6 +4,9 @@ extern crate gl;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
+use cgmath::{Matrix4, vec3, Rad};
+use cgmath::prelude::*;
+
 use image::GenericImageView;
 
 use std::sync::mpsc::Receiver;
@@ -98,6 +101,13 @@ impl Shader{
         let name = CString::new(name.as_bytes()).unwrap();
         unsafe{
             gl::Uniform1f(gl::GetUniformLocation(self.id, name.as_ptr()), value);
+        }
+    }
+
+    pub fn setMat4(&self, name: &str, value: Matrix4<f32>){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::UniformMatrix4fv(gl::GetUniformLocation(self.id, name.as_ptr()), 1, gl::FALSE, value.as_ptr());
         }
     }
 }
@@ -231,8 +241,16 @@ fn main(){
             gl::ActiveTexture(gl::TEXTURE1);
             gl::BindTexture(gl::TEXTURE_2D, texture1);
 
-            shaderProgram.useProgram();
             let gltime = glfw.get_time() as f32;
+            let mut trans : Matrix4<f32> = Matrix4::identity();
+            let mut skew: Matrix4<f32> = Matrix4::identity();
+            skew.x.x = 10.0 * gltime.sin();
+            trans = skew * trans;
+            trans = Matrix4::<f32>::from_angle_z(Rad(gltime)) * trans;
+            trans = Matrix4::<f32>::from_translation(vec3(0.5, -0.5, 0.0)) * trans;
+
+            shaderProgram.useProgram();
+            shaderProgram.setMat4("u_trans", trans);
             shaderProgram.setFloat("u_mix_param", gltime.sin().abs());
             gl::BindVertexArray(VAO);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
