@@ -8,9 +8,12 @@ out vec3 vert_color;
 out vec2 texCoords;
 
 uniform mat4 u_trans;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
 
 void main() {
-    gl_Position = u_trans * vec4(pos.x, pos.y, pos.z, 1.0);
+    gl_Position = u_projection * u_view * u_model * vec4(pos.x, pos.y, pos.z, 1.0);
     vert_color = color;
     texCoords = i_texCoords;
 }

@@ -4,7 +4,7 @@ extern crate gl;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
-use cgmath::{Matrix4, vec3, Rad};
+use cgmath::{Matrix4, vec3, Deg, perspective};
 use cgmath::prelude::*;
 
 use image::GenericImageView;
@@ -128,6 +128,8 @@ fn main(){
 
     let (shaderProgram, VAO, texture0, texture1) = unsafe {
 
+        gl::Enable(gl::DEPTH_TEST);
+
         let vertices: [f32;32] = [
             0.5, 0.5, 0.0,  1.0, 0.0, 0.0,  1.0, 1.0,
             0.5, -0.5, 0.0,  0.0, 1.0, 0.0,  1.0, 0.0,
@@ -234,7 +236,7 @@ fn main(){
 
         unsafe {
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, texture0);
@@ -242,16 +244,17 @@ fn main(){
             gl::BindTexture(gl::TEXTURE_2D, texture1);
 
             let gltime = glfw.get_time() as f32;
-            let mut trans : Matrix4<f32> = Matrix4::identity();
-            let mut skew: Matrix4<f32> = Matrix4::identity();
-            skew.x.x = 10.0 * gltime.sin();
-            trans = skew * trans;
-            trans = Matrix4::<f32>::from_angle_z(Rad(gltime)) * trans;
-            trans = Matrix4::<f32>::from_translation(vec3(0.5, -0.5, 0.0)) * trans;
+            let model = Matrix4::<f32>::from_angle_x(Deg(-50.0 * gltime));
+            let view: Matrix4<f32> = Matrix4::from_translation(vec3(0.0, 0.0, -3.0));
+            let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
-            shaderProgram.setMat4("u_trans", trans);
+
             shaderProgram.setFloat("u_mix_param", gltime.sin().abs());
+            shaderProgram.setMat4("u_model", model);
+            shaderProgram.setMat4("u_view", view);
+            shaderProgram.setMat4("u_projection", proj);
+
             gl::BindVertexArray(VAO);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
