@@ -4,7 +4,7 @@ extern crate gl;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
-use cgmath::{Matrix4, vec3, Deg, perspective};
+use cgmath::{Matrix4, vec3, Deg, perspective, Point3, Vector3};
 use cgmath::prelude::*;
 
 use image::GenericImageView;
@@ -126,6 +126,9 @@ fn main(){
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
+    let mut cam_pos = Point3::new(0.0, 0.0, 0.0);
+    let mut cam_front = vec3(0.0, 0.0, -1.0);
+
     let (shaderProgram, VAO, texture0, texture1) = unsafe {
 
         gl::Enable(gl::DEPTH_TEST);
@@ -228,11 +231,13 @@ fn main(){
 
     while !window.should_close() {
 
-        process_events(&mut window, &events);
+        process_events(&events);
+        process_input(&mut window, 0.01, &mut cam_pos, &mut cam_front);
 
         shaderProgram.useProgram();
         shaderProgram.setInt("tex0", 0);
         shaderProgram.setInt("tex1", 1);
+
 
         unsafe {
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
@@ -244,8 +249,8 @@ fn main(){
             gl::BindTexture(gl::TEXTURE_2D, texture1);
 
             let gltime = glfw.get_time() as f32;
-            let model = Matrix4::<f32>::from_angle_x(Deg(-50.0 * gltime));
-            let view: Matrix4<f32> = Matrix4::from_translation(vec3(0.0, 0.0, -3.0));
+            let model = Matrix4::<f32>::identity();
+            let view: Matrix4<f32> = Matrix4::look_at(Point3::new(cam_pos.x, cam_pos.y, cam_pos.z), Point3::new(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
@@ -264,14 +269,33 @@ fn main(){
     }
 }
 
-fn process_events(window: &mut glfw::Window, events: &Receiver<(f64, glfw::WindowEvent)>) {
+fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>) {
     for (_, event) in glfw::flush_messages(events) {
         match event {
             glfw::WindowEvent::FramebufferSize(width, height) => {
                 unsafe {gl::Viewport(0, 0, width, height);}
-            }
-            glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => window.set_should_close(true),
+            },
             _ => {}
         }
+    }
+}
+
+fn process_input(window: &mut glfw::Window, delta_time: f32, camera_pos: &mut Point3<f32>, camera_front: &mut Vector3<f32>){
+    if window.get_key(Key::Escape) == Action::Press {
+        window.set_should_close(true);
+    }
+
+    let camera_speed: f32 = 1.0*delta_time;
+    if window.get_key(Key::W) == Action::Press {
+        *camera_pos += camera_speed * *camera_front;
+    }
+    if window.get_key(Key::S) == Action::Press {
+        *camera_pos -= camera_speed * *camera_front;
+    }
+    if window.get_key(Key::A) == Action::Press {
+        *camera_pos -= camera_speed * camera_front.cross(vec3(0.0, 1.0, 0.0)).normalize();
+    }
+    if window.get_key(Key::D) == Action::Press {
+        *camera_pos += camera_speed * camera_front.cross(vec3(0.0, 1.0, 0.0)).normalize();
     }
 }
