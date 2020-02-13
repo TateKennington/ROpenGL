@@ -123,11 +123,20 @@ fn main(){
     window.make_current();
     window.set_key_polling(true);
     window.set_framebuffer_size_polling(true);
+    window.set_cursor_pos_polling(true);
+
+    window.set_cursor_mode(glfw::CursorMode::Disabled);
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
     let mut cam_pos = Point3::new(0.0, 0.0, 0.0);
     let mut cam_front = vec3(0.0, 0.0, -1.0);
+
+    let mut first_mouse = true;
+    let mut yaw: f32 = 0.0;
+    let mut pitch: f32 = 0.0;
+    let mut lastX: f32 = 0.0;
+    let mut lastY: f32 = 0.0;
 
     let (shaderProgram, VAO, texture0, texture1) = unsafe {
 
@@ -231,7 +240,7 @@ fn main(){
 
     while !window.should_close() {
 
-        process_events(&events);
+        process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut yaw, &mut pitch, &mut cam_front);
         process_input(&mut window, 0.01, &mut cam_pos, &mut cam_front);
 
         shaderProgram.useProgram();
@@ -250,7 +259,7 @@ fn main(){
 
             let gltime = glfw.get_time() as f32;
             let model = Matrix4::<f32>::identity();
-            let view: Matrix4<f32> = Matrix4::look_at(Point3::new(cam_pos.x, cam_pos.y, cam_pos.z), Point3::new(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+            let view: Matrix4<f32> = Matrix4::look_at(cam_pos, cam_pos+cam_front, vec3(0.0, 1.0, 0.0));
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
@@ -269,11 +278,46 @@ fn main(){
     }
 }
 
-fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>) {
+fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>, first_mouse: &mut bool, lastX: &mut f32, lastY: &mut f32, yaw: &mut f32,
+                  pitch: &mut f32, camera_front: &mut Vector3<f32>) {
+
     for (_, event) in glfw::flush_messages(events) {
         match event {
             glfw::WindowEvent::FramebufferSize(width, height) => {
                 unsafe {gl::Viewport(0, 0, width, height);}
+            },
+            glfw::WindowEvent::CursorPos(xpos, ypos) => {
+                let (xpos, ypos) = (xpos as f32, ypos as f32);
+                if *first_mouse{
+                    *lastX = xpos;
+                    *lastY = ypos;
+                    *first_mouse = false;
+                }
+
+                let mut xoff = xpos - *lastX;
+                let mut yoff = *lastY - ypos;
+                *lastX = xpos;
+                *lastY = ypos;
+
+                xoff *= 0.1;
+                yoff *= 0.1;
+
+                *yaw += xoff;
+                *pitch += yoff;
+
+                if *pitch > 89.0{
+                    *pitch = 89.0;
+                }
+                if *pitch < -89.0{
+                    *pitch = -89.0;
+                }
+
+                let front = Vector3{
+                    x: yaw.to_radians().cos() * pitch.to_radians().cos(),
+                    y: pitch.to_radians().sin(),
+                    z: yaw.to_radians().sin() * pitch.to_radians().cos(),
+                };
+                *camera_front = front;
             },
             _ => {}
         }
