@@ -19,6 +19,71 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+const CAM_FRONT: Vector3<f32> = vec3(0.0, 0.0, -1.0);
+const CAM_POS: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
+const YAW: f32 = 0.0;
+const PITCH: f32 = 0.0;
+
+pub enum Direction {
+    Forward,
+    Backward, 
+    Left,
+    Right,
+}
+
+struct Camera{
+    pos: Point3<f32>,
+    front: Vector3<f32>,
+    up: Vector3<f32>,
+    yaw: f32,
+    pitch: f32,
+}
+
+impl Camera{
+    fn new() -> Camera{
+        Camera{
+            pos: CAM_POS,
+            front: CAM_FRONT,
+            up: vec3(0.0, 1.0, 0.0),
+            yaw: YAW,
+            pitch: PITCH
+        }
+    }
+
+    fn get_view(&self) -> Matrix4<f32>{
+        return Matrix4::look_at(self.pos, self.pos+self.front, self.up);
+    }
+
+    fn translate(&mut self, dir: Direction, delta_time:f32){
+        let camera_speed: f32 = 1.0*delta_time;
+
+        match dir{
+            Direction::Forward => self.pos += camera_speed * self.front,
+            Direction::Backward => self.pos -= camera_speed * self.front,
+            Direction::Left => self.pos -= camera_speed * self.front.cross(self.up).normalize(),
+            Direction::Right => self.pos += camera_speed * self.front.cross(self.up).normalize(),
+        }
+    }
+
+    fn turn(&mut self, yaw: f32, pitch: f32){
+        self.yaw += yaw;
+        self.pitch += pitch;
+
+        if self.pitch > 89.0{
+            self.pitch = 89.0;
+        }
+        if self.pitch < -89.0{
+            self.pitch = -89.0;
+        }
+
+        self.front = Vector3{
+            x: self.yaw.to_radians().cos() * self.pitch.to_radians().cos(),
+            y: self.pitch.to_radians().sin(),
+            z: self.yaw.to_radians().sin() * self.pitch.to_radians().cos(),
+        };
+    }
+}
+
 struct Shader{
     id: u32,
 }
@@ -129,12 +194,8 @@ fn main(){
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
-    let mut cam_pos = Point3::new(0.0, 0.0, 0.0);
-    let mut cam_front = vec3(0.0, 0.0, -1.0);
-
+    let mut camera = Camera::new();
     let mut first_mouse = true;
-    let mut yaw: f32 = 0.0;
-    let mut pitch: f32 = 0.0;
     let mut lastX: f32 = 0.0;
     let mut lastY: f32 = 0.0;
 
@@ -240,8 +301,8 @@ fn main(){
 
     while !window.should_close() {
 
-        process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut yaw, &mut pitch, &mut cam_front);
-        process_input(&mut window, 0.01, &mut cam_pos, &mut cam_front);
+        process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut camera);
+        process_input(&mut window, 0.01, &mut camera);
 
         shaderProgram.useProgram();
         shaderProgram.setInt("tex0", 0);
@@ -259,7 +320,7 @@ fn main(){
 
             let gltime = glfw.get_time() as f32;
             let model = Matrix4::<f32>::identity();
-            let view: Matrix4<f32> = Matrix4::look_at(cam_pos, cam_pos+cam_front, vec3(0.0, 1.0, 0.0));
+            let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
@@ -278,8 +339,7 @@ fn main(){
     }
 }
 
-fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>, first_mouse: &mut bool, lastX: &mut f32, lastY: &mut f32, yaw: &mut f32,
-                  pitch: &mut f32, camera_front: &mut Vector3<f32>) {
+fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>, first_mouse: &mut bool, lastX: &mut f32, lastY: &mut f32, camera: &mut Camera) {
 
     for (_, event) in glfw::flush_messages(events) {
         match event {
@@ -302,44 +362,28 @@ fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>, first_mouse: &mut
                 xoff *= 0.1;
                 yoff *= 0.1;
 
-                *yaw += xoff;
-                *pitch += yoff;
-
-                if *pitch > 89.0{
-                    *pitch = 89.0;
-                }
-                if *pitch < -89.0{
-                    *pitch = -89.0;
-                }
-
-                let front = Vector3{
-                    x: yaw.to_radians().cos() * pitch.to_radians().cos(),
-                    y: pitch.to_radians().sin(),
-                    z: yaw.to_radians().sin() * pitch.to_radians().cos(),
-                };
-                *camera_front = front;
+                camera.turn(xoff, yoff);
             },
             _ => {}
         }
     }
 }
 
-fn process_input(window: &mut glfw::Window, delta_time: f32, camera_pos: &mut Point3<f32>, camera_front: &mut Vector3<f32>){
+fn process_input(window: &mut glfw::Window, delta_time: f32, camera: &mut Camera){
     if window.get_key(Key::Escape) == Action::Press {
         window.set_should_close(true);
     }
 
-    let camera_speed: f32 = 1.0*delta_time;
     if window.get_key(Key::W) == Action::Press {
-        *camera_pos += camera_speed * *camera_front;
+        camera.translate(Direction::Forward, delta_time);
     }
     if window.get_key(Key::S) == Action::Press {
-        *camera_pos -= camera_speed * *camera_front;
+        camera.translate(Direction::Backward, delta_time);
     }
     if window.get_key(Key::A) == Action::Press {
-        *camera_pos -= camera_speed * camera_front.cross(vec3(0.0, 1.0, 0.0)).normalize();
+        camera.translate(Direction::Left, delta_time);
     }
     if window.get_key(Key::D) == Action::Press {
-        *camera_pos += camera_speed * camera_front.cross(vec3(0.0, 1.0, 0.0)).normalize();
+        camera.translate(Direction::Right, delta_time);
     }
 }
