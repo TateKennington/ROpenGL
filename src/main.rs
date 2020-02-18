@@ -54,8 +54,8 @@ impl Camera{
         return Matrix4::look_at(self.pos, self.pos+self.front, self.up);
     }
 
-    fn translate(&mut self, dir: Direction, delta_time:f32){
-        let camera_speed: f32 = 1.0*delta_time;
+    fn translate(&mut self, dir: Direction, delta_time: &f32){
+        let camera_speed: f32 = 5.0*delta_time;
 
         match dir{
             Direction::Forward => self.pos += camera_speed * self.front,
@@ -195,29 +195,66 @@ fn main(){
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
     let mut camera = Camera::new();
+    let mut light_pos: Vector3<f32> = vec3(1.2, 1.0, 2.0);
     let mut first_mouse = true;
     let mut lastX: f32 = 0.0;
     let mut lastY: f32 = 0.0;
 
-    let (shaderProgram, VAO, texture0, texture1) = unsafe {
+    let mut lastFrame: f32 = 0.0;
+    let mut delta_time: f32;
+
+
+    let (shaderProgram, VAO, lampShader, lampVAO) = unsafe {
 
         gl::Enable(gl::DEPTH_TEST);
 
-        let vertices: [f32;32] = [
-            0.5, 0.5, 0.0,  1.0, 0.0, 0.0,  1.0, 1.0,
-            0.5, -0.5, 0.0,  0.0, 1.0, 0.0,  1.0, 0.0,
-            -0.5, -0.5, 0.0,  0.0, 0.0, 1.0,  0.0, 0.0,
-            -0.5, 0.5, 0.0,  0.0, 0.0, 0.0,  0.0, 1.0
-        ];
-        let indices = [
-            0, 1, 3,
-            1, 2, 3
+        let vertices: [f32; 108] = [
+            -0.5, -0.5, -0.5,
+             0.5, -0.5, -0.5,
+             0.5,  0.5, -0.5,
+             0.5,  0.5, -0.5,
+            -0.5,  0.5, -0.5,
+            -0.5, -0.5, -0.5,
+
+            -0.5, -0.5,  0.5,
+             0.5, -0.5,  0.5,
+             0.5,  0.5,  0.5,
+             0.5,  0.5,  0.5,
+            -0.5,  0.5,  0.5,
+            -0.5, -0.5,  0.5,
+
+            -0.5,  0.5,  0.5,
+            -0.5,  0.5, -0.5,
+            -0.5, -0.5, -0.5,
+            -0.5, -0.5, -0.5,
+            -0.5, -0.5,  0.5,
+            -0.5,  0.5,  0.5,
+
+             0.5,  0.5,  0.5,
+             0.5,  0.5, -0.5,
+             0.5, -0.5, -0.5,
+             0.5, -0.5, -0.5,
+             0.5, -0.5,  0.5,
+             0.5,  0.5,  0.5,
+
+            -0.5, -0.5, -0.5,
+             0.5, -0.5, -0.5,
+             0.5, -0.5,  0.5,
+             0.5, -0.5,  0.5,
+            -0.5, -0.5,  0.5,
+            -0.5, -0.5, -0.5,
+
+            -0.5,  0.5, -0.5,
+             0.5,  0.5, -0.5,
+             0.5,  0.5,  0.5,
+             0.5,  0.5,  0.5,
+            -0.5,  0.5,  0.5,
+            -0.5,  0.5, -0.5,
         ];
 
-        let (mut VBO, mut VAO, mut EBO) = (0, 0, 0);
+        let (mut VBO, mut VAO, mut lampVAO) = (0, 0, 0);
         gl::GenVertexArrays(1, &mut VAO);
         gl::GenBuffers(1, &mut VBO);
-        gl::GenBuffers(1, &mut EBO);
 
         gl::BindVertexArray(VAO);
         
@@ -226,83 +263,35 @@ fn main(){
                         (vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
                         &vertices[0] as *const f32 as *const c_void,
                         gl::STATIC_DRAW);
-        
-        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, EBO);
-        gl::BufferData(gl::ELEMENT_ARRAY_BUFFER,
-                      (indices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-                      &indices[0] as *const i32 as *const c_void,
-                      gl::STATIC_DRAW);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
-        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
-        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (6 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(0);
-        gl::EnableVertexAttribArray(1);
-        gl::EnableVertexAttribArray(2);
 
-        let mut texture0 = 0;
-        gl::GenTextures(1, &mut texture0);
-        gl::BindTexture(gl::TEXTURE_2D, texture0);
+        gl::GenVertexArrays(1, &mut lampVAO);
+        
+        gl::BindVertexArray(lampVAO);
 
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
-
-        let img = image::open(&Path::new("textures/container.jpg")).expect("Failed to load texture");
-        let data = img.raw_pixels();
-        gl::TexImage2D(gl::TEXTURE_2D,
-                        0,
-                        gl::RGB as i32,
-                        img.width() as i32,
-                        img.height() as i32,
-                        0,
-                        gl::RGB,
-                        gl::UNSIGNED_BYTE,
-                        &data[0] as *const u8 as *const c_void
-                    );
-        gl::GenerateMipmap(gl::TEXTURE_2D);
-
-        let mut texture1 = 0;
-        gl::GenTextures(1, &mut texture1);
-        gl::BindTexture(gl::TEXTURE_2D, texture1);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
-
-        let img = image::open(&Path::new("textures/awesomeface.png")).expect("Failed to load texture");
-        let img = img.flipv();
-        let data = img.raw_pixels();
-        gl::TexImage2D(gl::TEXTURE_2D,
-                        0,
-                        gl::RGB as i32,
-                        img.width() as i32,
-                        img.height() as i32,
-                        0,
-                        gl::RGBA,
-                        gl::UNSIGNED_BYTE,
-                        &data[0] as *const u8 as *const c_void
-                    );
-        gl::GenerateMipmap(gl::TEXTURE_2D);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::EnableVertexAttribArray(0);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
 
         gl::BindVertexArray(0);
         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
 
-        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO, texture0, texture1)
+        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO, Shader::new("shaders/lamp.vert", "shaders/lamp.frag"), lampVAO)
 
     };
 
 
     while !window.should_close() {
 
+        let current_time = glfw.get_time() as f32;
+        delta_time = current_time - lastFrame;
+        lastFrame = current_time;
+
         process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut camera);
-        process_input(&mut window, 0.01, &mut camera);
+        process_input(&mut window, &delta_time, &mut camera);
 
         shaderProgram.useProgram();
         shaderProgram.setInt("tex0", 0);
@@ -313,25 +302,33 @@ fn main(){
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-            gl::ActiveTexture(gl::TEXTURE0);
-            gl::BindTexture(gl::TEXTURE_2D, texture0);
-            gl::ActiveTexture(gl::TEXTURE1);
-            gl::BindTexture(gl::TEXTURE_2D, texture1);
-
-            let gltime = glfw.get_time() as f32;
             let model = Matrix4::<f32>::identity();
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
 
-            shaderProgram.setFloat("u_mix_param", gltime.sin().abs());
             shaderProgram.setMat4("u_model", model);
             shaderProgram.setMat4("u_view", view);
             shaderProgram.setMat4("u_projection", proj);
+            shaderProgram.setUniform4f("object_color", (0.0, 0.5, 0.3, 1.0));
+            shaderProgram.setUniform4f("light_color", (1.0, 1.0, 1.0, 1.0));
 
             gl::BindVertexArray(VAO);
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+
+            let model = Matrix4::<f32>::from_translation(light_pos)*Matrix4::<f32>::from_scale(0.2);
+            let view: Matrix4<f32> = camera.get_view();
+            let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
+
+            lampShader.useProgram();
+
+            lampShader.setMat4("u_model", model);
+            lampShader.setMat4("u_view", view);
+            lampShader.setMat4("u_projection", proj);
+            
+            gl::BindVertexArray(lampVAO);
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
         }
 
         window.swap_buffers();
@@ -369,7 +366,7 @@ fn process_events(events: &Receiver<(f64, glfw::WindowEvent)>, first_mouse: &mut
     }
 }
 
-fn process_input(window: &mut glfw::Window, delta_time: f32, camera: &mut Camera){
+fn process_input(window: &mut glfw::Window, delta_time: &f32, camera: &mut Camera){
     if window.get_key(Key::Escape) == Action::Press {
         window.set_should_close(true);
     }
