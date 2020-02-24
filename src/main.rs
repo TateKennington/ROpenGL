@@ -155,6 +155,13 @@ impl Shader{
         }
     }
 
+    pub fn setUniform3f(&self, name: &str, vector: (f32, f32, f32)){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::Uniform3f(gl::GetUniformLocation(self.id, name.as_ptr()), vector.0, vector.1, vector.2);
+        }
+    }
+
     pub fn setInt(&self, name: &str, value: i32){
         let name = CString::new(name.as_bytes()).unwrap();
         unsafe{
@@ -208,48 +215,48 @@ fn main(){
 
         gl::Enable(gl::DEPTH_TEST);
 
-        let vertices: [f32; 108] = [
-            -0.5, -0.5, -0.5,
-             0.5, -0.5, -0.5,
-             0.5,  0.5, -0.5,
-             0.5,  0.5, -0.5,
-            -0.5,  0.5, -0.5,
-            -0.5, -0.5, -0.5,
+        let vertices: [f32; 216] = [
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
+             0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
+             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
+             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
+            -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
 
-            -0.5, -0.5,  0.5,
-             0.5, -0.5,  0.5,
-             0.5,  0.5,  0.5,
-             0.5,  0.5,  0.5,
-            -0.5,  0.5,  0.5,
-            -0.5, -0.5,  0.5,
+            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
+             0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
+             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
+             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
+            -0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
+            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
 
-            -0.5,  0.5,  0.5,
-            -0.5,  0.5, -0.5,
-            -0.5, -0.5, -0.5,
-            -0.5, -0.5, -0.5,
-            -0.5, -0.5,  0.5,
-            -0.5,  0.5,  0.5,
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+            -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
 
-             0.5,  0.5,  0.5,
-             0.5,  0.5, -0.5,
-             0.5, -0.5, -0.5,
-             0.5, -0.5, -0.5,
-             0.5, -0.5,  0.5,
-             0.5,  0.5,  0.5,
+             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+             0.5,  0.5, -0.5,  1.0,  0.0,  0.0,
+             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+             0.5, -0.5,  0.5,  1.0,  0.0,  0.0,
+             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
 
-            -0.5, -0.5, -0.5,
-             0.5, -0.5, -0.5,
-             0.5, -0.5,  0.5,
-             0.5, -0.5,  0.5,
-            -0.5, -0.5,  0.5,
-            -0.5, -0.5, -0.5,
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+             0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+            -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
 
-            -0.5,  0.5, -0.5,
-             0.5,  0.5, -0.5,
-             0.5,  0.5,  0.5,
-             0.5,  0.5,  0.5,
-            -0.5,  0.5,  0.5,
-            -0.5,  0.5, -0.5,
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+             0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+            -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
         ];
 
         let (mut VBO, mut VAO, mut lampVAO) = (0, 0, 0);
@@ -264,14 +271,16 @@ fn main(){
                         &vertices[0] as *const f32 as *const c_void,
                         gl::STATIC_DRAW);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::EnableVertexAttribArray(1);
 
         gl::GenVertexArrays(1, &mut lampVAO);
         
         gl::BindVertexArray(lampVAO);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(0);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -289,6 +298,8 @@ fn main(){
         let current_time = glfw.get_time() as f32;
         delta_time = current_time - lastFrame;
         lastFrame = current_time;
+
+        light_pos = vec3(5.0*current_time.cos(), 5.0*current_time.cos(), 5.0*current_time.sin());
 
         process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut camera);
         process_input(&mut window, &delta_time, &mut camera);
@@ -311,8 +322,10 @@ fn main(){
             shaderProgram.setMat4("u_model", model);
             shaderProgram.setMat4("u_view", view);
             shaderProgram.setMat4("u_projection", proj);
-            shaderProgram.setUniform4f("object_color", (0.0, 0.5, 0.3, 1.0));
-            shaderProgram.setUniform4f("light_color", (1.0, 1.0, 1.0, 1.0));
+            shaderProgram.setUniform3f("object_color", (0.0, 0.5, 0.3));
+            shaderProgram.setUniform3f("light_color", (1.0, 1.0, 1.0));
+            shaderProgram.setUniform3f("light_pos", (light_pos.x, light_pos.y, light_pos.z));
+            shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
 
             gl::BindVertexArray(VAO);
             gl::DrawArrays(gl::TRIANGLES, 0, 36);
