@@ -299,7 +299,7 @@ fn main(){
         delta_time = current_time - lastFrame;
         lastFrame = current_time;
 
-        light_pos = vec3(5.0*current_time.cos(), 5.0*current_time.cos(), 5.0*current_time.sin());
+        light_pos = vec3(5.0*current_time.cos(), 0.0, 5.0*current_time.sin());
 
         process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut camera);
         process_input(&mut window, &delta_time, &mut camera);
@@ -322,10 +322,15 @@ fn main(){
             shaderProgram.setMat4("u_model", model);
             shaderProgram.setMat4("u_view", view);
             shaderProgram.setMat4("u_projection", proj);
-            shaderProgram.setUniform3f("object_color", (0.0, 0.5, 0.3));
-            shaderProgram.setUniform3f("light_color", (1.0, 1.0, 1.0));
-            shaderProgram.setUniform3f("light_pos", (light_pos.x, light_pos.y, light_pos.z));
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
+            shaderProgram.setUniform3f("light.pos", (light_pos.x, light_pos.y, light_pos.z));
+            shaderProgram.setUniform3f("material.ambient", (1.0, 0.5, 0.31));
+            shaderProgram.setUniform3f("material.diffuse", (1.0, 0.5, 0.31));
+            shaderProgram.setUniform3f("material.specular", (0.5, 0.5, 0.5));
+            shaderProgram.setFloat("material.shininess", 32.0);
+            shaderProgram.setUniform3f("light.ambient", (0.2, 0.2, 0.2));
+            shaderProgram.setUniform3f("light.diffuse", (0.5, 0.5, 0.5));
+            shaderProgram.setUniform3f("light.specular", (1.0, 1.0, 1.0));
 
             gl::BindVertexArray(VAO);
             gl::DrawArrays(gl::TRIANGLES, 0, 36);
