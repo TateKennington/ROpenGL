@@ -211,52 +211,53 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let (shaderProgram, VAO, lampShader, lampVAO) = unsafe {
+    let (shaderProgram, VAO, lampShader, lampVAO, diffuse_texture, specular_texture, emission_texture) = unsafe {
 
         gl::Enable(gl::DEPTH_TEST);
 
-        let vertices: [f32; 216] = [
-            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
-             0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
-             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
-             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
-            -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,
-            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
+        let vertices: [f32; 288] = [
+            // positions       // normals        // texture coords
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  0.0,
+             0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  0.0,
+             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  1.0,
+             0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0,  1.0,
+            -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  1.0,
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0,  0.0,
 
-            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
-             0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
-             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
-             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
-            -0.5,  0.5,  0.5,  0.0,  0.0,  1.0,
-            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,
+            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  0.0,
+             0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  0.0,
+             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  1.0,
+             0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0,  1.0,
+            -0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  1.0,
+            -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  0.0,  0.0,
 
-            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
-            -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
-            -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,
-            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0,  0.0,
+            -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  1.0,  1.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0,  1.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0,  1.0,
+            -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0,  0.0,
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0,  0.0,
 
-             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
-             0.5,  0.5, -0.5,  1.0,  0.0,  0.0,
-             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
-             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
-             0.5, -0.5,  0.5,  1.0,  0.0,  0.0,
-             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0,  0.0,
+             0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0,  1.0,
+             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0,  1.0,
+             0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0,  1.0,
+             0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  0.0,  0.0,
+             0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0,  0.0,
 
-            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
-             0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
-             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-            -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
-            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0,  1.0,
+             0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  1.0,  1.0,
+             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0,  0.0,
+             0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0,  0.0,
+            -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0,  0.0,
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0,  1.0,
 
-            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
-             0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
-             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-            -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
-            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0,  1.0,
+             0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0,  1.0,
+             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0,  0.0,
+             0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0,  0.0,
+            -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  0.0,  0.0,
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0,  1.0
         ];
 
         let (mut VBO, mut VAO, mut lampVAO) = (0, 0, 0);
@@ -271,16 +272,18 @@ fn main(){
                         &vertices[0] as *const f32 as *const c_void,
                         gl::STATIC_DRAW);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(0);
-        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
         gl::EnableVertexAttribArray(1);
+        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, (6 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::EnableVertexAttribArray(2);
 
         gl::GenVertexArrays(1, &mut lampVAO);
         
         gl::BindVertexArray(lampVAO);
 
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 8 * mem::size_of::<GLfloat>() as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(0);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -288,7 +291,81 @@ fn main(){
         gl::BindVertexArray(0);
         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
 
-        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO, Shader::new("shaders/lamp.vert", "shaders/lamp.frag"), lampVAO)
+        let (mut diffuse_texture, mut specular_texture, mut emission_texture) = (0, 0, 0);
+
+        gl::GenTextures(1, &mut diffuse_texture);
+        gl::BindTexture(gl::TEXTURE_2D, diffuse_texture);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        let img = image::open(&Path::new("textures/container2.png")).unwrap();
+        let data = img.raw_pixels();
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGBA as i32,
+            img.width() as i32,
+            img.height() as i32,
+            0,
+            gl::RGBA,
+            gl::UNSIGNED_BYTE,
+            &data[0] as *const u8 as *const c_void
+        );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        gl::GenTextures(1, &mut specular_texture);
+        gl::BindTexture(gl::TEXTURE_2D, specular_texture);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        let img = image::open(&Path::new("textures/container2_specular.png")).unwrap();
+        let data = img.raw_pixels();
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGBA as i32,
+            img.width() as i32,
+            img.height() as i32,
+            0,
+            gl::RGBA,
+            gl::UNSIGNED_BYTE,
+            &data[0] as *const u8 as *const c_void
+        );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        gl::GenTextures(1, &mut emission_texture);
+        gl::BindTexture(gl::TEXTURE_2D, emission_texture);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        let img = image::open(&Path::new("textures/emission.png")).unwrap();
+        let data = img.raw_pixels();
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGBA as i32,
+            img.width() as i32,
+            img.height() as i32,
+            0,
+            gl::RGBA,
+            gl::UNSIGNED_BYTE,
+            &data[0] as *const u8 as *const c_void
+        );
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), VAO, Shader::new("shaders/lamp.vert", "shaders/lamp.frag"), lampVAO, diffuse_texture, specular_texture, emission_texture)
 
     };
 
@@ -305,8 +382,6 @@ fn main(){
         process_input(&mut window, &delta_time, &mut camera);
 
         shaderProgram.useProgram();
-        shaderProgram.setInt("tex0", 0);
-        shaderProgram.setInt("tex1", 1);
 
 
         unsafe {
@@ -317,6 +392,13 @@ fn main(){
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindTexture(gl::TEXTURE_2D, diffuse_texture);
+            gl::ActiveTexture(gl::TEXTURE1);
+            gl::BindTexture(gl::TEXTURE_2D, specular_texture);
+            gl::ActiveTexture(gl::TEXTURE2);
+            gl::BindTexture(gl::TEXTURE_2D, emission_texture);
+
             shaderProgram.useProgram();
 
             shaderProgram.setMat4("u_model", model);
@@ -324,9 +406,9 @@ fn main(){
             shaderProgram.setMat4("u_projection", proj);
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
             shaderProgram.setUniform3f("light.pos", (light_pos.x, light_pos.y, light_pos.z));
-            shaderProgram.setUniform3f("material.ambient", (1.0, 0.5, 0.31));
-            shaderProgram.setUniform3f("material.diffuse", (1.0, 0.5, 0.31));
-            shaderProgram.setUniform3f("material.specular", (0.5, 0.5, 0.5));
+            shaderProgram.setInt("material.diffuse", 0);
+            shaderProgram.setInt("material.specular", 1);
+            shaderProgram.setInt("material.emission", 2);
             shaderProgram.setFloat("material.shininess", 32.0);
             shaderProgram.setUniform3f("light.ambient", (0.2, 0.2, 0.2));
             shaderProgram.setUniform3f("light.diffuse", (0.5, 0.5, 0.5));
