@@ -369,6 +369,18 @@ fn main(){
 
     };
 
+    let cubePositions: [Vector3<f32>; 10] = [
+            vec3( 0.0,  0.0,  0.0),
+            vec3( 2.0,  5.0, -15.0),
+            vec3(-1.5, -2.2, -2.5),
+            vec3(-3.8, -2.0, -12.3),
+            vec3( 2.4, -0.4, -3.5),
+            vec3(-1.7,  3.0, -7.5),
+            vec3( 1.3, -2.0, -2.5),
+            vec3( 1.5,  2.0, -2.5),
+            vec3( 1.5,  0.2, -1.5),
+            vec3(-1.3,  1.0, -1.5)
+        ];
 
     while !window.should_close() {
 
@@ -388,7 +400,6 @@ fn main(){
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-            let model = Matrix4::<f32>::identity();
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
@@ -396,26 +407,40 @@ fn main(){
             gl::BindTexture(gl::TEXTURE_2D, diffuse_texture);
             gl::ActiveTexture(gl::TEXTURE1);
             gl::BindTexture(gl::TEXTURE_2D, specular_texture);
-            gl::ActiveTexture(gl::TEXTURE2);
-            gl::BindTexture(gl::TEXTURE_2D, emission_texture);
+            /* gl::ActiveTexture(gl::TEXTURE2);
+            gl::BindTexture(gl::TEXTURE_2D, emission_texture); */
 
             shaderProgram.useProgram();
 
-            shaderProgram.setMat4("u_model", model);
             shaderProgram.setMat4("u_view", view);
             shaderProgram.setMat4("u_projection", proj);
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
-            shaderProgram.setUniform3f("light.pos", (light_pos.x, light_pos.y, light_pos.z));
+            //shaderProgram.setUniform3f("light.direction", (camera.front.x, camera.front.y, camera.front.z));
+            shaderProgram.setFloat("light.cutoff", -1.0);
+            //shaderProgram.setFloat("light.outerCutoff", (0.3 as f32).cos());
+            //shaderProgram.setUniform4f("light.light_vector", (camera.pos.x, camera.pos.y, camera.pos.z, 1.0));
+            shaderProgram.setUniform4f("light.light_vector", (-0.2, -1.0, -0.3, 0.0));
+            //shaderProgram.setUniform4f("light.light_vector", (light_pos.x, light_pos.y, light_pos.z, 1.0));
             shaderProgram.setInt("material.diffuse", 0);
             shaderProgram.setInt("material.specular", 1);
-            shaderProgram.setInt("material.emission", 2);
+            /* shaderProgram.setInt("material.emission", 2); */
             shaderProgram.setFloat("material.shininess", 32.0);
             shaderProgram.setUniform3f("light.ambient", (0.2, 0.2, 0.2));
             shaderProgram.setUniform3f("light.diffuse", (0.5, 0.5, 0.5));
             shaderProgram.setUniform3f("light.specular", (1.0, 1.0, 1.0));
+            shaderProgram.setFloat("light.c", 1.0);
+            shaderProgram.setFloat("light.l", 0.09);
+            shaderProgram.setFloat("light.q", 0.032);
 
             gl::BindVertexArray(VAO);
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+
+            for (i, position) in cubePositions.iter().enumerate(){
+                let angle = 20.0 * i as f32;
+                let model = Matrix4::<f32>::from_translation(*position)*Matrix4::from_axis_angle(vec3(1.0, 0.3, 0.5).normalize(), Deg(angle));
+                shaderProgram.setMat4("u_model", model);
+
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            }
 
             let model = Matrix4::<f32>::from_translation(light_pos)*Matrix4::<f32>::from_scale(0.2);
             let view: Matrix4<f32> = camera.get_view();
