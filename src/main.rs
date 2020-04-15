@@ -380,8 +380,16 @@ fn main(){
             vec3( 1.5,  2.0, -2.5),
             vec3( 1.5,  0.2, -1.5),
             vec3(-1.3,  1.0, -1.5)
-        ];
+    ];
 
+    let light_positions: [Vector3<f32>; 6] = [
+        vec3( 0.7,  0.2,  2.0),
+        vec3( 2.3, -3.3, -4.0),
+        vec3(-4.0,  2.0, -12.0),
+        vec3( 0.0,  0.0, -3.0),
+        vec3( 5.0,  0.0, 0.0),
+        vec3( 0.0,  0.0, -6.0)
+    ];
     while !window.should_close() {
 
         let current_time = glfw.get_time() as f32;
@@ -411,26 +419,41 @@ fn main(){
             gl::BindTexture(gl::TEXTURE_2D, emission_texture); */
 
             shaderProgram.useProgram();
+            
+            shaderProgram.setUniform3f("dir_light.direction", (-0.2, -1.0, -0.3));
+            shaderProgram.setUniform3f("dir_light.ambient", (0.2, 0.2, 0.2));
+            shaderProgram.setUniform3f("dir_light.diffuse", (0.2, 0.2, 0.2));
+            shaderProgram.setUniform3f("dir_light.specular", (0.2, 0.2, 0.2));
+
+            shaderProgram.setUniform3f("spot_light.pos", (camera.pos.x, camera.pos.y, camera.pos.z));
+            shaderProgram.setUniform3f("spot_light.direction", (camera.front.x, camera.front.y, camera.front.z));
+            shaderProgram.setUniform3f("spot_light.ambient", (0.2, 0.2, 0.2));
+            shaderProgram.setUniform3f("spot_light.diffuse", (0.5, 0.5, 0.5));
+            shaderProgram.setUniform3f("spot_light.specular", (1.0, 1.0, 1.0));
+            shaderProgram.setFloat("spot_light.cutoff", (0.2 as f32).cos());
+            shaderProgram.setFloat("spot_light.outerCutoff", (0.3 as f32).cos());
 
             shaderProgram.setMat4("u_view", view);
             shaderProgram.setMat4("u_projection", proj);
+
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
-            //shaderProgram.setUniform3f("light.direction", (camera.front.x, camera.front.y, camera.front.z));
-            shaderProgram.setFloat("light.cutoff", -1.0);
-            //shaderProgram.setFloat("light.outerCutoff", (0.3 as f32).cos());
-            //shaderProgram.setUniform4f("light.light_vector", (camera.pos.x, camera.pos.y, camera.pos.z, 1.0));
-            shaderProgram.setUniform4f("light.light_vector", (-0.2, -1.0, -0.3, 0.0));
-            //shaderProgram.setUniform4f("light.light_vector", (light_pos.x, light_pos.y, light_pos.z, 1.0));
+
             shaderProgram.setInt("material.diffuse", 0);
             shaderProgram.setInt("material.specular", 1);
-            /* shaderProgram.setInt("material.emission", 2); */
             shaderProgram.setFloat("material.shininess", 32.0);
-            shaderProgram.setUniform3f("light.ambient", (0.2, 0.2, 0.2));
-            shaderProgram.setUniform3f("light.diffuse", (0.5, 0.5, 0.5));
-            shaderProgram.setUniform3f("light.specular", (1.0, 1.0, 1.0));
-            shaderProgram.setFloat("light.c", 1.0);
-            shaderProgram.setFloat("light.l", 0.09);
-            shaderProgram.setFloat("light.q", 0.032);
+            
+            for (i, position) in light_positions.iter().enumerate(){
+
+                shaderProgram.setUniform3f(&format!("point_lights[{}].pos", i), (position.x, position.y, position.z));
+
+                shaderProgram.setUniform3f(&format!("point_lights[{}].ambient", i), (0.2, 0.2, 0.2));
+                shaderProgram.setUniform3f(&format!("point_lights[{}].diffuse", i), (0.5, 0.5, 0.5));
+                shaderProgram.setUniform3f(&format!("point_lights[{}].specular", i), (1.0, 1.0, 1.0));
+
+                shaderProgram.setFloat(&format!("point_lights[{}].c", i), 1.0);
+                shaderProgram.setFloat(&format!("point_lights[{}].l", i), 0.09);
+                shaderProgram.setFloat(&format!("point_lights[{}].q", i), 0.05);
+            }
 
             gl::BindVertexArray(VAO);
 
@@ -442,18 +465,21 @@ fn main(){
                 gl::DrawArrays(gl::TRIANGLES, 0, 36);
             }
 
-            let model = Matrix4::<f32>::from_translation(light_pos)*Matrix4::<f32>::from_scale(0.2);
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
-
+            
             lampShader.useProgram();
-
-            lampShader.setMat4("u_model", model);
             lampShader.setMat4("u_view", view);
             lampShader.setMat4("u_projection", proj);
             
             gl::BindVertexArray(lampVAO);
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+
+            for position in light_positions.iter(){
+                let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.2);
+                lampShader.setMat4("u_model", model);
+                
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            }
         }
 
         window.swap_buffers();
