@@ -51,11 +51,46 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let (shaderProgram, lampShader, outlineShader) = unsafe {
+    let (shaderProgram, lampShader, outlineShader, transparentShader, quadVAO) = unsafe {
 
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::STENCIL_TEST);
-        (Shader::new("shaders/shader.vert", "shaders/shader.frag"), Shader::new("shaders/lamp.vert", "shaders/lamp.frag"), Shader::new("shaders/shader.vert", "shaders/outlineShader.frag"))
+        gl::Enable(gl::BLEND);
+        gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        
+        let mut quadVAO = 0;
+        let mut quadVBO = 0;
+
+        gl::GenVertexArrays(1, &mut quadVAO);
+        gl::GenBuffers(1, &mut quadVBO);
+
+        let vertices: [f32; 30] = [
+            -1.0, 1.0, 0.0, 0.0, 0.0,
+            1.0, 1.0, 0.0, 1.0, 0.0,
+            1.0, -1.0, 0.0, 1.0, 1.0,
+            1.0, -1.0, 0.0, 1.0, 1.0,
+            -1.0, -1.0, 0.0, 0.0, 1.0,
+            -1.0, 1.0, 0.0, 0.0, 0.0,
+        ];
+
+        gl::BindVertexArray(quadVAO);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, quadVBO);
+        gl::BufferData(gl::ARRAY_BUFFER, (mem::size_of::<GLfloat>() * vertices.len()) as GLsizeiptr, &vertices[0] as *const f32 as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (5 * mem::size_of::<GLfloat>()) as GLsizei, ptr::null());
+        gl::EnableVertexAttribArray(2);
+        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, (5 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+
+        gl::BindVertexArray(0);
+        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        (
+            Shader::new("shaders/shader.vert","shaders/shader.frag"),
+            Shader::new("shaders/lamp.vert","shaders/lamp.frag"),
+            Shader::new("shaders/shader.vert","shaders/outlineShader.frag"),
+            Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
+            quadVAO
+        )
 
     };
 
@@ -136,9 +171,6 @@ fn main(){
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
-
-            let view: Matrix4<f32> = camera.get_view();
-            let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
             
             lampShader.useProgram();
             lampShader.setMat4("u_view", view);
@@ -166,7 +198,23 @@ fn main(){
                 cube_model.draw(&outlineShader);
             }
 
+            gl::Enable(gl::DEPTH_TEST);
+            gl::StencilOp(gl::KEEP, gl::KEEP, gl::KEEP);
+            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+            gl::StencilMask(0xFF);
+            transparentShader.useProgram();
 
+            let model_mat: Matrix4<f32> = Matrix4::identity();
+
+            transparentShader.setMat4("u_model", model_mat);
+            transparentShader.setMat4("u_view", view);
+            transparentShader.setMat4("u_projection", proj);
+
+            unsafe{
+                gl::BindVertexArray(quadVAO);
+                gl::DrawArrays(gl::TRIANGLES, 0, 6);
+                gl::BindVertexArray(0);
+            }
         }
 
         window.swap_buffers();
