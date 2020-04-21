@@ -51,11 +51,40 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let (shaderProgram, lampShader, outlineShader, transparentShader, quadVAO) = unsafe {
+    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, quadVAO, fbo, color_buffer) = unsafe {
+
+        let mut fbo = 0;
+        gl::GenFramebuffers(1, &mut fbo);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+
+        let mut tex = 0;
+        gl::GenTextures(1, &mut tex);
+        gl::BindTexture(gl::TEXTURE_2D, tex);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGB as i32, 800, 600, 0, gl::RGB, gl::UNSIGNED_BYTE, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tex, 0);
+
+        let mut rbo = 0;
+        gl::GenRenderbuffers(1, &mut rbo);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, rbo);
+        gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH24_STENCIL8, 800, 600);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, 0);
+
+        gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_STENCIL_ATTACHMENT, gl::RENDERBUFFER, rbo);
+        
+        if gl::CheckFramebufferStatus(gl::FRAMEBUFFER) != gl::FRAMEBUFFER_COMPLETE {
+            println!("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
+        }
+        println!("Made Framebuffer good");
+        
+        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
         gl::Enable(gl::DEPTH_TEST);
         gl::Enable(gl::STENCIL_TEST);
+        //gl::Enable(gl::CULL_FACE);
         gl::Enable(gl::BLEND);
+        gl::CullFace(gl::FRONT);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         
         let mut quadVAO = 0;
@@ -65,12 +94,12 @@ fn main(){
         gl::GenBuffers(1, &mut quadVBO);
 
         let vertices: [f32; 30] = [
-            -1.0, 1.0, 0.0, 0.0, 0.0,
-            1.0, 1.0, 0.0, 1.0, 0.0,
-            1.0, -1.0, 0.0, 1.0, 1.0,
-            1.0, -1.0, 0.0, 1.0, 1.0,
-            -1.0, -1.0, 0.0, 0.0, 1.0,
-            -1.0, 1.0, 0.0, 0.0, 0.0,
+            -1.0, 1.0, 0.0, 0.0, 1.0,
+            1.0, 1.0, 0.0, 1.0, 1.0,
+            1.0, -1.0, 0.0, 1.0, 0.0,
+            1.0, -1.0, 0.0, 1.0, 0.0,
+            -1.0, -1.0, 0.0, 0.0, 0.0,
+            -1.0, 1.0, 0.0, 0.0, 1.0,
         ];
 
         gl::BindVertexArray(quadVAO);
@@ -79,17 +108,20 @@ fn main(){
         gl::BufferData(gl::ARRAY_BUFFER, (mem::size_of::<GLfloat>() * vertices.len()) as GLsizeiptr, &vertices[0] as *const f32 as *const c_void, gl::STATIC_DRAW);
         gl::EnableVertexAttribArray(0);
         gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (5 * mem::size_of::<GLfloat>()) as GLsizei, ptr::null());
-        gl::EnableVertexAttribArray(2);
-        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, (5 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        gl::EnableVertexAttribArray(1);
+        gl::VertexAttribPointer(1, 2, gl::FLOAT, gl::FALSE, (5 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
 
         gl::BindVertexArray(0);
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
         (
+            Shader::new("shaders/postpro.vert", "shaders/postpro.frag"),
             Shader::new("shaders/shader.vert","shaders/shader.frag"),
             Shader::new("shaders/lamp.vert","shaders/lamp.frag"),
             Shader::new("shaders/shader.vert","shaders/outlineShader.frag"),
             Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
-            quadVAO
+            quadVAO,
+            fbo,
+            tex
         )
 
     };
@@ -121,14 +153,11 @@ fn main(){
         process_events(&events, &mut first_mouse, &mut lastX, &mut lastY, &mut camera);
         process_input(&mut window, &delta_time, &mut camera);
 
-        shaderProgram.useProgram();
-
         unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
-            gl::Enable(gl::DEPTH_TEST);
-            gl::StencilOp(gl::KEEP, gl::KEEP, gl::KEEP);
-            gl::StencilMask(0xFF);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+            gl::Enable(gl::DEPTH_TEST);
 
             let model_mat: Matrix4<f32> = Matrix4::identity();
             let view: Matrix4<f32> = camera.get_view();
@@ -228,7 +257,19 @@ fn main(){
                 gl::DrawArrays(gl::TRIANGLES, 0, 6);
             }
             gl::BindVertexArray(0);
-            
+         
+            /* gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::ClearColor(0.0, 0.5, 0.5, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+            gl::Disable(gl::DEPTH_TEST);
+
+            postproShader.useProgram();
+            gl::BindTexture(gl::TEXTURE_2D, color_buffer);
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindVertexArray(quadVAO);
+            gl::DrawArrays(gl::TRIANGLES, 0, 6);
+            gl::BindVertexArray(0); */
+
         }
 
         window.swap_buffers();
