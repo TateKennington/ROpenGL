@@ -103,6 +103,12 @@ fn main(){
         vec3( 0.0,  0.0, -6.0)
     ];
 
+    let mut windows_positions = Vec::<Vector3<f32>>::new();
+
+    for i in 1..5 {
+        windows_positions.push(Vector3::<f32>::unit_z() * i as f32);
+    }
+
     let model = Model::new("models/corona.obj");
     let cube_model = Model::new("models/cube.obj");
 
@@ -210,11 +216,19 @@ fn main(){
             transparentShader.setMat4("u_view", view);
             transparentShader.setMat4("u_projection", proj);
 
-            unsafe{
-                gl::BindVertexArray(quadVAO);
+            windows_positions.sort_by(|a, b| {
+                let pos = camera.pos.to_vec();
+                (pos.distance2(*a)).partial_cmp(&pos.distance2(*b)).unwrap().reverse()
+            });
+
+            gl::BindVertexArray(quadVAO);
+            for position in windows_positions.iter(){
+                let model_mat = Matrix4::<f32>::from_translation(*position);
+                transparentShader.setMat4("u_model", model_mat);
                 gl::DrawArrays(gl::TRIANGLES, 0, 6);
-                gl::BindVertexArray(0);
             }
+            gl::BindVertexArray(0);
+            
         }
 
         window.swap_buffers();
