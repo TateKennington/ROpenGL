@@ -154,7 +154,7 @@ fn main(){
         process_input(&mut window, &delta_time, &mut camera);
 
         unsafe {
-            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Enable(gl::DEPTH_TEST);
@@ -258,7 +258,7 @@ fn main(){
             }
             gl::BindVertexArray(0);
          
-            /* gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Disable(gl::DEPTH_TEST);
@@ -268,7 +268,7 @@ fn main(){
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindVertexArray(quadVAO);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
-            gl::BindVertexArray(0); */
+            gl::BindVertexArray(0);
 
         }
 
