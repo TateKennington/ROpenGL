@@ -24,6 +24,10 @@ use std::ptr;
 use std::mem;
 use std::os::raw::c_void;
 
+use std::path::Path;
+use image;
+use image::DynamicImage::*;
+use image::GenericImageView;
 
 fn main(){
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -51,7 +55,7 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, quadVAO, fbo, color_buffer) = unsafe {
+    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, quadVAO, fbo, color_buffer, skybox, cubeVAO) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -64,6 +68,7 @@ fn main(){
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
         gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, tex, 0);
+        gl::BindTexture(gl::TEXTURE_2D, 0);
 
         let mut rbo = 0;
         gl::GenRenderbuffers(1, &mut rbo);
@@ -81,12 +86,112 @@ fn main(){
         gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
         gl::Enable(gl::DEPTH_TEST);
+        gl::DepthFunc(gl::LEQUAL);
         gl::Enable(gl::STENCIL_TEST);
         //gl::Enable(gl::CULL_FACE);
         gl::Enable(gl::BLEND);
         gl::CullFace(gl::FRONT);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         
+        let mut skybox = 0;
+        gl::GenTextures(1, &mut skybox);
+        gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
+
+        let skybox_paths = vec!(
+            "textures/right.jpg",
+            "textures/left.jpg",
+            "textures/top.jpg",
+            "textures/bottom.jpg",
+            "textures/back.jpg",
+            "textures/front.jpg"
+        );
+
+        for (i, path) in skybox_paths.iter().enumerate(){
+
+            let img = image::open(&Path::new(path)).expect("Failed");
+            let format = match img{
+                ImageLuma8(_) => gl::RED,
+                ImageLumaA8(_) => gl::RG,
+                ImageRgb8(_) => gl::RGB,
+                ImageRgba8(_) => gl::RGBA,
+                _ => panic!("Unsupported image format")
+            };
+
+            let data = img.raw_pixels();
+
+            gl::TexImage2D(gl::TEXTURE_CUBE_MAP_POSITIVE_X + i as u32, 0, format as i32, img.width() as i32, img.height() as i32,
+                            0, format, gl::UNSIGNED_BYTE, &data[0] as *const u8 as *const c_void);
+        }
+
+        gl::TexParameteri(gl::TEXTURE_CUBE_MAP, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_CUBE_MAP, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_CUBE_MAP, gl::TEXTURE_WRAP_R, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_CUBE_MAP, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_CUBE_MAP, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
+        gl::BindTexture(gl::TEXTURE_CUBE_MAP, 0);
+
+        let mut cubeVAO = 0;
+        let mut cubeVBO = 0;
+
+        gl::GenVertexArrays(1, &mut cubeVAO);
+        gl::GenBuffers(1, &mut cubeVBO);
+
+        let vertices: [f32; 108] = [
+            // positions          
+            -1.0,  1.0, -1.0,
+            -1.0, -1.0, -1.0,
+             1.0, -1.0, -1.0,
+             1.0, -1.0, -1.0,
+             1.0,  1.0, -1.0,
+            -1.0,  1.0, -1.0,
+        
+            -1.0, -1.0,  1.0,
+            -1.0, -1.0, -1.0,
+            -1.0,  1.0, -1.0,
+            -1.0,  1.0, -1.0,
+            -1.0,  1.0,  1.0,
+            -1.0, -1.0,  1.0,
+        
+             1.0, -1.0, -1.0,
+             1.0, -1.0,  1.0,
+             1.0,  1.0,  1.0,
+             1.0,  1.0,  1.0,
+             1.0,  1.0, -1.0,
+             1.0, -1.0, -1.0,
+        
+            -1.0, -1.0,  1.0,
+            -1.0,  1.0,  1.0,
+             1.0,  1.0,  1.0,
+             1.0,  1.0,  1.0,
+             1.0, -1.0,  1.0,
+            -1.0, -1.0,  1.0,
+        
+            -1.0,  1.0, -1.0,
+             1.0,  1.0, -1.0,
+             1.0,  1.0,  1.0,
+             1.0,  1.0,  1.0,
+            -1.0,  1.0,  1.0,
+            -1.0,  1.0, -1.0,
+        
+            -1.0, -1.0, -1.0,
+            -1.0, -1.0,  1.0,
+             1.0, -1.0, -1.0,
+             1.0, -1.0, -1.0,
+            -1.0, -1.0,  1.0,
+             1.0, -1.0,  1.0
+        ];
+
+        gl::BindVertexArray(cubeVAO);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, cubeVBO);
+        gl::BufferData(gl::ARRAY_BUFFER, (mem::size_of::<GLfloat>() * vertices.len()) as GLsizeiptr, &vertices[0] as *const f32 as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (3 * mem::size_of::<GLfloat>()) as GLsizei, ptr::null());
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        gl::BindVertexArray(0);
+
         let mut quadVAO = 0;
         let mut quadVBO = 0;
 
@@ -119,9 +224,12 @@ fn main(){
             Shader::new("shaders/lamp.vert","shaders/lamp.frag"),
             Shader::new("shaders/shader.vert","shaders/outlineShader.frag"),
             Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
+            Shader::new("shaders/skybox.vert", "shaders/skybox.frag"),
             quadVAO,
             fbo,
-            tex
+            tex,
+            skybox,
+            cubeVAO
         )
 
     };
@@ -154,14 +262,31 @@ fn main(){
         process_input(&mut window, &delta_time, &mut camera);
 
         unsafe {
-            gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Enable(gl::DEPTH_TEST);
 
             let model_mat: Matrix4<f32> = Matrix4::identity();
-            let view: Matrix4<f32> = camera.get_view();
+            let mut view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
+
+            skyboxShader.useProgram();
+
+            view.w[0] = 0.0;
+            view.w[1] = 0.0;
+            view.w[2] = 0.0;
+            skyboxShader.setMat4("u_view", view);
+            skyboxShader.setMat4("u_proj", proj);
+
+            gl::DepthMask(gl::FALSE);
+            gl::BindVertexArray(cubeVAO);
+            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
+            skyboxShader.setInt("skybox", 0);
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            gl::DepthMask(gl::TRUE);
+
+            let view: Matrix4<f32> = camera.get_view();
 
             shaderProgram.useProgram();
             
@@ -258,7 +383,7 @@ fn main(){
             }
             gl::BindVertexArray(0);
          
-            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            /* gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Disable(gl::DEPTH_TEST);
@@ -268,7 +393,7 @@ fn main(){
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindVertexArray(quadVAO);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
-            gl::BindVertexArray(0);
+            gl::BindVertexArray(0); */
 
         }
 

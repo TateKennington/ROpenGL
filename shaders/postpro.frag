@@ -7,9 +7,9 @@ out vec4 color;
 uniform sampler2D texture1;
 
 void main(){
-    //color = vec4(texture(texture1, uv).rgb, 1.0);
+    color = vec4(texture(texture1, uv).rgb, 1.0);
     //color = vec4(vec3(1.0 - texture(texture1, uv)), 1.0);
-    float offset = 1.0/300.0;
+    /* float offset = 1.0/300.0;
 
     vec2 offsets[9] = vec2[](
         vec2(-offset, offset), // top-left
@@ -38,5 +38,5 @@ void main(){
         col += sample[i];
     }
 
-    color = vec4(col, 1.0);
+    color = vec4(col, 1.0); */
 }
