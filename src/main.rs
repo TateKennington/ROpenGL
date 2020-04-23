@@ -55,7 +55,7 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, quadVAO, fbo, color_buffer, skybox, cubeVAO) = unsafe {
+    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -218,6 +218,65 @@ fn main(){
 
         gl::BindVertexArray(0);
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+
+        let mut containerVAO = 0;
+        let mut containerVBO = 0;
+
+        let vertices: [f32;216] = [
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
+            0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
+            0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+            0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+            -0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+            -0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
+
+            -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+            0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+            0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+            0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+            -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+            -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+            -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+            -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,
+            -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+
+            0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+            0.5,  0.5, -0.5,  1.0,  0.0,  0.0,
+            0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+            0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+            0.5, -0.5,  0.5,  1.0,  0.0,  0.0,
+            0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+            0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+            0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+            0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+            -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+            -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+            0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+            0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+            0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+            -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+            -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
+        ];
+
+        gl::GenVertexArrays(1, &mut containerVAO);
+        gl::GenBuffers(1, &mut containerVBO);
+
+        gl::BindVertexArray(containerVAO);
+        gl::BindBuffer(gl::ARRAY_BUFFER, containerVBO);
+        gl::BufferData(gl::ARRAY_BUFFER, (mem::size_of::<GLfloat>() * vertices.len()) as GLsizeiptr, &vertices[0] as *const f32 as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, ptr::null());
+        gl::EnableVertexAttribArray(1);
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+
         (
             Shader::new("shaders/postpro.vert", "shaders/postpro.frag"),
             Shader::new("shaders/shader.vert","shaders/shader.frag"),
@@ -225,11 +284,13 @@ fn main(){
             Shader::new("shaders/shader.vert","shaders/outlineShader.frag"),
             Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
             Shader::new("shaders/skybox.vert", "shaders/skybox.frag"),
+            Shader::new("shaders/shader.vert", "shaders/reflection.frag"),
             quadVAO,
             fbo,
             tex,
             skybox,
-            cubeVAO
+            cubeVAO,
+            containerVAO
         )
 
     };
@@ -268,25 +329,8 @@ fn main(){
             gl::Enable(gl::DEPTH_TEST);
 
             let model_mat: Matrix4<f32> = Matrix4::identity();
-            let mut view: Matrix4<f32> = camera.get_view();
-            let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
-
-            skyboxShader.useProgram();
-
-            view.w[0] = 0.0;
-            view.w[1] = 0.0;
-            view.w[2] = 0.0;
-            skyboxShader.setMat4("u_view", view);
-            skyboxShader.setMat4("u_proj", proj);
-
-            gl::DepthMask(gl::FALSE);
-            gl::BindVertexArray(cubeVAO);
-            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
-            skyboxShader.setInt("skybox", 0);
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
-            gl::DepthMask(gl::TRUE);
-
             let view: Matrix4<f32> = camera.get_view();
+            let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
             shaderProgram.useProgram();
             
@@ -325,9 +369,17 @@ fn main(){
                 shaderProgram.setFloat(&format!("point_lights[{}].l", i), 0.09);
                 shaderProgram.setFloat(&format!("point_lights[{}].q", i), 0.05);
             }
+            
+            reflectionShader.useProgram();
+            reflectionShader.setMat4("u_view", view);
+            reflectionShader.setMat4("u_projection", proj);
+            reflectionShader.setMat4("u_model", model_mat);
+            reflectionShader.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
+            reflectionShader.setInt("skybox", 0);
+            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
+            model.draw(&reflectionShader);
 
-            model.draw(&shaderProgram);
-
+            
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
@@ -343,22 +395,6 @@ fn main(){
                 cube_model.draw(&lampShader);
             }
 
-            gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
-            gl::StencilMask(0x00);
-            gl::Disable(gl::DEPTH_TEST);
-
-            outlineShader.useProgram();
-            outlineShader.setMat4("u_view", view);
-            outlineShader.setMat4("u_projection", proj);
-
-            for position in light_positions.iter(){
-                let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.25);
-                outlineShader.setMat4("u_model", model);
-                
-                cube_model.draw(&outlineShader);
-            }
-
-            gl::Enable(gl::DEPTH_TEST);
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::KEEP);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
@@ -383,6 +419,44 @@ fn main(){
             }
             gl::BindVertexArray(0);
          
+            let mut view = view;
+
+            skyboxShader.useProgram();
+
+            view.w[0] = 0.0;
+            view.w[1] = 0.0;
+            view.w[2] = 0.0;
+            skyboxShader.setMat4("u_view", view);
+            skyboxShader.setMat4("u_proj", proj);
+
+            gl::DepthFunc(gl::LEQUAL);
+            gl::BindVertexArray(cubeVAO);
+            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
+            skyboxShader.setInt("skybox", 0);
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            gl::DepthFunc(gl::LESS);
+
+            gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
+            gl::StencilMask(0x00);
+            gl::Disable(gl::DEPTH_TEST);
+
+            let view: Matrix4<f32> = camera.get_view();
+
+            outlineShader.useProgram();
+            outlineShader.setMat4("u_view", view);
+            outlineShader.setMat4("u_projection", proj);
+
+            for position in light_positions.iter(){
+                let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.25);
+                outlineShader.setMat4("u_model", model);
+                
+                cube_model.draw(&outlineShader);
+            }
+
+            gl::Enable(gl::DEPTH_TEST);
+            gl::StencilOp(gl::KEEP, gl::KEEP, gl::KEEP);
+            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+            gl::StencilMask(0xFF);
             /* gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
