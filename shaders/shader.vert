@@ -8,9 +8,12 @@ out vec3 normal;
 out vec3 frag_pos;
 out vec2 uv;
 
+layout (std140) uniform Matrices {
+    uniform mat4 u_projection;
+    uniform mat4 u_view;
+};
+
 uniform mat4 u_model;
-uniform mat4 u_view;
-uniform mat4 u_projection;
 
 void main() {
     gl_Position = u_projection * u_view * u_model * vec4(pos.x, pos.y, pos.z, 1.0);

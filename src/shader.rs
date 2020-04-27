@@ -107,4 +107,11 @@ impl Shader{
             gl::UniformMatrix4fv(gl::GetUniformLocation(self.id, name.as_ptr()), 1, gl::FALSE, value.as_ptr());
         }
     }
+
+    pub fn bindUniformBlock(&self, name: &str, value: u32){
+        let name = CString::new(name.as_bytes()).unwrap();
+        unsafe{
+            gl::UniformBlockBinding(self.id, gl::GetUniformBlockIndex(self.id, name.as_ptr()), value);
+        }
+    }
 }

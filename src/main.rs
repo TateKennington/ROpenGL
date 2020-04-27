@@ -55,7 +55,7 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO) = unsafe {
+    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, pointShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO, ubo) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -89,6 +89,7 @@ fn main(){
         gl::DepthFunc(gl::LEQUAL);
         gl::Enable(gl::STENCIL_TEST);
         //gl::Enable(gl::CULL_FACE);
+        gl::Enable(gl::PROGRAM_POINT_SIZE);
         gl::Enable(gl::BLEND);
         gl::CullFace(gl::FRONT);
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -277,20 +278,38 @@ fn main(){
         gl::EnableVertexAttribArray(1);
         gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
 
+        let shaderProgram = Shader::new("shaders/shader.vert","shaders/shader.frag");
+        shaderProgram.bindUniformBlock("Matrices", 0);
+
+        let mut ubo = 0;
+        
+        gl::GenBuffers(1, &mut ubo);
+        gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
+        gl::BufferData(gl::UNIFORM_BUFFER, 2 * mem::size_of::<Matrix4<f32>>() as isize, ptr::null(), gl::STATIC_DRAW);
+
+        gl::BindBufferRange(gl::UNIFORM_BUFFER, 0, ubo, 0, 2 * mem::size_of::<Matrix4<f32>>() as isize);
+
+        let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
+
+        gl::BufferSubData(gl::UNIFORM_BUFFER, 0, mem::size_of::<Matrix4<f32>>() as isize, proj.as_ptr() as *const c_void);
+        gl::BindBuffer(gl::UNIFORM_BUFFER, 0);
+
         (
             Shader::new("shaders/postpro.vert", "shaders/postpro.frag"),
-            Shader::new("shaders/shader.vert","shaders/shader.frag"),
+            shaderProgram,
             Shader::new("shaders/lamp.vert","shaders/lamp.frag"),
             Shader::new("shaders/shader.vert","shaders/outlineShader.frag"),
             Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
             Shader::new("shaders/skybox.vert", "shaders/skybox.frag"),
             Shader::new("shaders/shader.vert", "shaders/reflection.frag"),
+            Shader::new("shaders/point.vert", "shaders/lamp.frag"),
             quadVAO,
             fbo,
             tex,
             skybox,
             cubeVAO,
-            containerVAO
+            containerVAO,
+            ubo
         )
 
     };
@@ -332,6 +351,10 @@ fn main(){
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
 
+            gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
+            gl::BufferSubData(gl::UNIFORM_BUFFER, mem::size_of::<Matrix4<f32>>() as isize, mem::size_of::<Matrix4<f32>>() as isize, view.as_ptr() as *const c_void);
+            gl::BindBuffer(gl::UNIFORM_BUFFER, 0);
+
             shaderProgram.useProgram();
             
             shaderProgram.setUniform3f("dir_light.direction", (-0.2, -1.0, -0.3));
@@ -348,8 +371,6 @@ fn main(){
             shaderProgram.setFloat("spot_light.outerCutoff", (0.3 as f32).cos());
 
             shaderProgram.setMat4("u_model", model_mat);
-            shaderProgram.setMat4("u_view", view);
-            shaderProgram.setMat4("u_projection", proj);
 
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
 
@@ -370,14 +391,12 @@ fn main(){
                 shaderProgram.setFloat(&format!("point_lights[{}].q", i), 0.05);
             }
             
-            reflectionShader.useProgram();
-            reflectionShader.setMat4("u_view", view);
-            reflectionShader.setMat4("u_projection", proj);
-            reflectionShader.setMat4("u_model", model_mat);
-            reflectionShader.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
-            reflectionShader.setInt("skybox", 0);
-            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox);
-            model.draw(&reflectionShader);
+            model.draw(&shaderProgram);
+
+            pointShader.useProgram();
+            pointShader.setMat4("u_model", model_mat);
+            gl::BindVertexArray(containerVAO);
+            gl::DrawArrays(gl::POINTS, 0, 36);
 
             
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
@@ -385,8 +404,6 @@ fn main(){
             gl::StencilMask(0xFF);
             
             lampShader.useProgram();
-            lampShader.setMat4("u_view", view);
-            lampShader.setMat4("u_projection", proj);
 
             for position in light_positions.iter(){
                 let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.2);
@@ -403,8 +420,6 @@ fn main(){
             let model_mat: Matrix4<f32> = Matrix4::identity();
 
             transparentShader.setMat4("u_model", model_mat);
-            transparentShader.setMat4("u_view", view);
-            transparentShader.setMat4("u_projection", proj);
 
             windows_positions.sort_by(|a, b| {
                 let pos = camera.pos.to_vec();
@@ -418,16 +433,8 @@ fn main(){
                 gl::DrawArrays(gl::TRIANGLES, 0, 6);
             }
             gl::BindVertexArray(0);
-         
-            let mut view = view;
 
             skyboxShader.useProgram();
-
-            view.w[0] = 0.0;
-            view.w[1] = 0.0;
-            view.w[2] = 0.0;
-            skyboxShader.setMat4("u_view", view);
-            skyboxShader.setMat4("u_proj", proj);
 
             gl::DepthFunc(gl::LEQUAL);
             gl::BindVertexArray(cubeVAO);
@@ -440,11 +447,7 @@ fn main(){
             gl::StencilMask(0x00);
             gl::Disable(gl::DEPTH_TEST);
 
-            let view: Matrix4<f32> = camera.get_view();
-
             outlineShader.useProgram();
-            outlineShader.setMat4("u_view", view);
-            outlineShader.setMat4("u_projection", proj);
 
             for position in light_positions.iter(){
                 let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.25);
