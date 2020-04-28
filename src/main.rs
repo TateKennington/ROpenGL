@@ -278,7 +278,7 @@ fn main(){
         gl::EnableVertexAttribArray(1);
         gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
 
-        let shaderProgram = Shader::new("shaders/shader.vert","shaders/shader.frag");
+        let shaderProgram = Shader::newGeometry("shaders/shader.vert","shaders/shader.frag", "shaders/explode.geom");
         shaderProgram.bindUniformBlock("Matrices", 0);
 
         let mut ubo = 0;
@@ -302,7 +302,7 @@ fn main(){
             Shader::new("shaders/shader.vert","shaders/transparentShader.frag"),
             Shader::new("shaders/skybox.vert", "shaders/skybox.frag"),
             Shader::new("shaders/shader.vert", "shaders/reflection.frag"),
-            Shader::new("shaders/point.vert", "shaders/lamp.frag"),
+            Shader::newGeometry("shaders/point.vert", "shaders/lamp.frag", "shaders/point.geom"),
             quadVAO,
             fbo,
             tex,
@@ -373,6 +373,8 @@ fn main(){
             shaderProgram.setMat4("u_model", model_mat);
 
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
+
+            shaderProgram.setFloat("time", glfw.get_time() as f32);
 
             shaderProgram.setInt("material.diffuse", 0);
             shaderProgram.setInt("material.specular", 1);
