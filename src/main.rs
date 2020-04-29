@@ -16,7 +16,7 @@ use shader::Shader;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
-use cgmath::{Matrix4, vec3, Deg, perspective, Vector3};
+use cgmath::{Matrix4, vec3, Deg, perspective, Vector3, Vector4};
 use cgmath::prelude::*;
 
 use std::sync::mpsc::Receiver;
@@ -55,7 +55,7 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, pointShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO, ubo) = unsafe {
+    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, pointShader, instanceShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO, ubo) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -222,6 +222,7 @@ fn main(){
 
         let mut containerVAO = 0;
         let mut containerVBO = 0;
+        let mut modelVBO = 0;
 
         let vertices: [f32;216] = [
             -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
@@ -267,8 +268,19 @@ fn main(){
             -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
         ];
 
+        let mut models:Vec<Matrix4<f32>> = vec!();
+
+        for i in 1..100{
+            for j in 1..100{
+                for k in 1..100{
+                    models.push(Matrix4::from_translation(Vector3::unit_x()* 2.0*i as f32 + Vector3::unit_y()* 2.0*j as f32 + Vector3::unit_z() * 2.0 * k as f32));
+                }
+            }
+        } 
+
         gl::GenVertexArrays(1, &mut containerVAO);
         gl::GenBuffers(1, &mut containerVBO);
+        gl::GenBuffers(1, &mut modelVBO);
 
         gl::BindVertexArray(containerVAO);
         gl::BindBuffer(gl::ARRAY_BUFFER, containerVBO);
@@ -277,6 +289,25 @@ fn main(){
         gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, ptr::null());
         gl::EnableVertexAttribArray(1);
         gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, (6 * mem::size_of::<GLfloat>()) as GLsizei, (3 * mem::size_of::<GLfloat>()) as *const c_void);
+        
+        gl::BindBuffer(gl::ARRAY_BUFFER, modelVBO);
+        gl::BufferData(gl::ARRAY_BUFFER, (mem::size_of::<Matrix4<f32>>() * models.len()) as isize, &models[0] as *const Matrix4<f32> as *const c_void, gl::STATIC_DRAW);
+        gl::EnableVertexAttribArray(2);
+        gl::VertexAttribPointer(2, 4, gl::FLOAT, gl::FALSE, (mem::size_of::<Matrix4<f32>>()) as i32, ptr::null());
+        gl::EnableVertexAttribArray(3);
+        gl::VertexAttribPointer(3, 4, gl::FLOAT, gl::FALSE, (mem::size_of::<Matrix4<f32>>()) as i32, (mem::size_of::<Vector4<f32>>()) as i32 as *const c_void);
+        gl::EnableVertexAttribArray(4);
+        gl::VertexAttribPointer(4, 4, gl::FLOAT, gl::FALSE, (mem::size_of::<Matrix4<f32>>()) as i32, (2 * mem::size_of::<Vector4<f32>>()) as i32 as *const c_void);
+        gl::EnableVertexAttribArray(5);
+        gl::VertexAttribPointer(5, 4, gl::FLOAT, gl::FALSE, (mem::size_of::<Matrix4<f32>>()) as i32, (3 * mem::size_of::<Vector4<f32>>()) as i32 as *const c_void);
+
+        gl::VertexAttribDivisor(2, 1);
+        gl::VertexAttribDivisor(3, 1);
+        gl::VertexAttribDivisor(4, 1);
+        gl::VertexAttribDivisor(5, 1);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        gl::BindVertexArray(0);
 
         let shaderProgram = Shader::newGeometry("shaders/shader.vert","shaders/shader.frag", "shaders/explode.geom");
         shaderProgram.bindUniformBlock("Matrices", 0);
@@ -303,6 +334,7 @@ fn main(){
             Shader::new("shaders/skybox.vert", "shaders/skybox.frag"),
             Shader::new("shaders/shader.vert", "shaders/reflection.frag"),
             Shader::newGeometry("shaders/point.vert", "shaders/lamp.frag", "shaders/point.geom"),
+            Shader::new("shaders/instance.vert", "shaders/lamp.frag"),
             quadVAO,
             fbo,
             tex,
@@ -400,7 +432,11 @@ fn main(){
             gl::BindVertexArray(containerVAO);
             gl::DrawArrays(gl::POINTS, 0, 36);
 
-            
+            instanceShader.useProgram();
+            gl::DrawArraysInstanced(gl::TRIANGLES, 0, 36, 100*100*100);
+
+            gl::BindVertexArray(0);
+
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
