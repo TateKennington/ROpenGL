@@ -33,6 +33,7 @@ fn main(){
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
     glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+    glfw.window_hint(glfw::WindowHint::Samples(Some(4)));
 
     let (mut window, events) = glfw.create_window(800, 600, "Slugma", glfw::WindowMode::Windowed)
         .expect("Failed to create glfw window");
@@ -55,7 +56,23 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader, shaderProgram, lampShader, outlineShader, transparentShader, skyboxShader, reflectionShader, pointShader, instanceShader, quadVAO, fbo, color_buffer, skybox, cubeVAO, containerVAO, ubo) = unsafe {
+    let ( postproShader,
+          shaderProgram,
+          lampShader,
+          outlineShader,
+          transparentShader,
+          skyboxShader,
+          reflectionShader,
+          pointShader,
+          instanceShader,
+          quadVAO,
+          fbo,
+          color_buffer,
+          skybox,
+          cubeVAO,
+          containerVAO,
+          ubo,
+          ms_fbo) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -85,8 +102,26 @@ fn main(){
         
         gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
+        let mut ms_fbo = 0;
+        gl::GenFramebuffers(1, &mut ms_fbo);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, ms_fbo);
+
+        let mut ms_tex = 0;
+        gl::GenTextures(1, &mut ms_tex);
+        gl::BindTexture(gl::TEXTURE_2D_MULTISAMPLE, ms_tex);
+        gl::TexImage2DMultisample(gl::TEXTURE_2D_MULTISAMPLE, 4, gl::RGB, 800, 600, gl::TRUE);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D_MULTISAMPLE, ms_tex, 0);
+        gl::BindTexture(gl::TEXTURE_2D_MULTISAMPLE, 0);
+
+        let mut ms_rbo = 0;
+        gl::GenRenderbuffers(1, &mut ms_rbo);
+        gl::BindRenderbuffer(gl::RENDERBUFFER, ms_rbo);
+        gl::RenderbufferStorageMultisample(gl::RENDERBUFFER, 4, gl::DEPTH24_STENCIL8, 800, 600);
+        gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_STENCIL_ATTACHMENT, gl::RENDERBUFFER, ms_rbo);
+
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LEQUAL);
+        gl::Enable(gl::MULTISAMPLE);
         gl::Enable(gl::STENCIL_TEST);
         //gl::Enable(gl::CULL_FACE);
         gl::Enable(gl::PROGRAM_POINT_SIZE);
@@ -341,7 +376,8 @@ fn main(){
             skybox,
             cubeVAO,
             containerVAO,
-            ubo
+            ubo,
+            ms_fbo
         )
 
     };
@@ -374,7 +410,7 @@ fn main(){
         process_input(&mut window, &delta_time, &mut camera);
 
         unsafe {
-            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, ms_fbo);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Enable(gl::DEPTH_TEST);
@@ -498,7 +534,12 @@ fn main(){
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::KEEP);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
-            /* gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            
+            gl::BindFramebuffer(gl::READ_FRAMEBUFFER, ms_fbo);
+            gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, fbo);
+            gl::BlitFramebuffer(0, 0, 800, 600, 0, 0, 800, 600, gl::COLOR_BUFFER_BIT, gl::NEAREST);
+
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
             gl::ClearColor(0.0, 0.5, 0.5, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             gl::Disable(gl::DEPTH_TEST);
@@ -508,7 +549,7 @@ fn main(){
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindVertexArray(quadVAO);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
-            gl::BindVertexArray(0); */
+            gl::BindVertexArray(0);
 
         }
 
