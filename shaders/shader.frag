@@ -59,9 +59,9 @@ vec3 calculateDirLight(DirLight dir_light, vec3 norm, vec3 view_dir){
     float diff = max(dot(norm, light_dir), 0.0);
     vec3 diffuse = diff*dir_light.diffuse*vec3(texture(material.texture_diffuse1, uv));
 
-    vec3 reflect_dir = reflect(-light_dir, norm);
+    vec3 halfway = normalize(view_dir + light_dir);
 
-    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+    float spec = pow(max(dot(norm, halfway), 0.0), material.shininess);
     vec3 specular = spec * dir_light.specular * vec3(texture(material.texture_specular1, uv));
 
     return (ambient + diffuse + specular);
@@ -77,9 +77,9 @@ vec3 calculatePointLight(PointLight point_light, vec3 norm, vec3 view_dir, vec3 
     float diff = max(dot(norm, light_dir), 0.0);
     vec3 diffuse = diff*point_light.diffuse*vec3(texture(material.texture_diffuse1, uv));
 
-    vec3 reflect_dir = reflect(-light_dir, norm);
+    vec3 halfway = normalize(view_dir + light_dir);
 
-    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+    float spec = pow(max(dot(norm, halfway), 0.0), material.shininess);
     vec3 specular = spec * point_light.specular * vec3(texture(material.texture_specular1, uv));
 
     return attenuation * (ambient + diffuse + specular);
@@ -96,9 +96,9 @@ vec3 calculateSpotLight(SpotLight spot_light, vec3 norm, vec3 view_dir, vec3 fra
     float diff = max(dot(norm, light_dir), 0.0);
     vec3 diffuse = diff*spot_light.diffuse*vec3(texture(material.texture_diffuse1, uv));
 
-    vec3 reflect_dir = reflect(-light_dir, norm);
+    vec3 halfway = normalize(view_dir + light_dir);
 
-    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+    float spec = pow(max(dot(norm, halfway), 0.0), material.shininess);
     vec3 specular = spec * spot_light.specular * vec3(texture(material.texture_specular1, uv));
 
     return attenuation * (ambient + diffuse + specular);

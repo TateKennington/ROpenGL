@@ -446,7 +446,7 @@ fn main(){
 
             shaderProgram.setInt("material.diffuse", 0);
             shaderProgram.setInt("material.specular", 1);
-            shaderProgram.setFloat("material.shininess", 32.0);
+            shaderProgram.setFloat("material.shininess", 128.0);
             
             for (i, position) in light_positions.iter().enumerate(){
 
@@ -462,6 +462,7 @@ fn main(){
             }
             
             model.draw(&shaderProgram);
+            cube_model.draw(&shaderProgram);
 
             pointShader.useProgram();
             pointShader.setMat4("u_model", model_mat);

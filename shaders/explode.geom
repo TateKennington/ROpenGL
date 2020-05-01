@@ -1,7 +1,7 @@
 #version 330 core
 
 layout(triangles) in;
-layout(line_strip, max_vertices = 2) out;
+layout(triangle_strip, max_vertices = 3) out;
 
 in vec3 g_normal[];
 in vec3 g_frag_pos[];
@@ -25,7 +25,7 @@ uniform float time;
  }
 
  void main(){
-     /* vec3 norm = getNormal();
+     vec3 norm = getNormal();
 
      for(int i = 0; i<3; i++){
          gl_Position = explode(gl_in[i].gl_Position, norm);
@@ -35,9 +35,9 @@ uniform float time;
          EmitVertex();
      }
 
-     EndPrimitive(); */
+     EndPrimitive();
 
-    for(int i = 0; i<3; i++){
+    /* for(int i = 0; i<3; i++){
         normal = g_normal[i];
         frag_pos = g_frag_pos[i];
         uv = g_uv[i];
@@ -46,5 +46,5 @@ uniform float time;
         gl_Position = gl_in[i].gl_Position + vec4(g_mvp_normal[i], 0.0) * 0.4;
         EmitVertex();
         EndPrimitive();
-    }
+    } */
  }
