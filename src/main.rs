@@ -123,6 +123,7 @@ fn main(){
         gl::DepthFunc(gl::LEQUAL);
         gl::Enable(gl::MULTISAMPLE);
         gl::Enable(gl::STENCIL_TEST);
+        gl::Enable(gl::FRAMEBUFFER_SRGB);
         //gl::Enable(gl::CULL_FACE);
         gl::Enable(gl::PROGRAM_POINT_SIZE);
         gl::Enable(gl::BLEND);
