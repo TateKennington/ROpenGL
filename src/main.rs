@@ -16,7 +16,7 @@ use shader::Shader;
 use glfw::{Context, Key, Action};
 use gl::types::*;
 
-use cgmath::{Matrix4, vec3, Deg, perspective, Vector3, Vector4};
+use cgmath::{Matrix4, vec3, Deg, perspective, Vector3, Vector4, Point3, ortho};
 use cgmath::prelude::*;
 
 use std::sync::mpsc::Receiver;
@@ -56,7 +56,8 @@ fn main(){
     let mut delta_time: f32;
 
 
-    let ( postproShader,
+    let ( 
+          postproShader,
           shaderProgram,
           lampShader,
           outlineShader,
@@ -65,6 +66,7 @@ fn main(){
           reflectionShader,
           pointShader,
           instanceShader,
+          shadowShader,
           quadVAO,
           fbo,
           color_buffer,
@@ -72,7 +74,10 @@ fn main(){
           cubeVAO,
           containerVAO,
           ubo,
-          ms_fbo) = unsafe {
+          ms_fbo,
+          shadow_fbo,
+          shadow_texture
+        ) = unsafe {
 
         let mut fbo = 0;
         gl::GenFramebuffers(1, &mut fbo);
@@ -118,6 +123,25 @@ fn main(){
         gl::BindRenderbuffer(gl::RENDERBUFFER, ms_rbo);
         gl::RenderbufferStorageMultisample(gl::RENDERBUFFER, 4, gl::DEPTH24_STENCIL8, 800, 600);
         gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_STENCIL_ATTACHMENT, gl::RENDERBUFFER, ms_rbo);
+
+        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+
+        let mut shadow_fbo = 0;
+        gl::GenFramebuffers(1, &mut shadow_fbo);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, shadow_fbo);
+
+        let mut shadow_texture = 0;
+        gl::GenTextures(1, &mut shadow_texture);
+        gl::BindTexture(gl::TEXTURE_2D, shadow_texture);
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::DEPTH_COMPONENT as i32, 1024, 1024, 0, gl::DEPTH_COMPONENT, gl::FLOAT, ptr::null());
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::TEXTURE_2D, shadow_texture, 0);
+        gl::BindTexture(gl::TEXTURE_2D, 0);
+
+        gl::DrawBuffer(gl::NONE);
+        gl::ReadBuffer(gl::NONE);
+        gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 
         gl::Enable(gl::DEPTH_TEST);
         gl::DepthFunc(gl::LEQUAL);
@@ -345,7 +369,8 @@ fn main(){
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
         gl::BindVertexArray(0);
 
-        let shaderProgram = Shader::newGeometry("shaders/shader.vert","shaders/shader.frag", "shaders/explode.geom");
+        //let shaderProgram = Shader::newGeometry("shaders/shader.vert","shaders/shader.frag", "shaders/explode.geom");
+        let shaderProgram = Shader::new("shaders/shader.vert","shaders/shader.frag");
         shaderProgram.bindUniformBlock("Matrices", 0);
 
         let mut ubo = 0;
@@ -371,6 +396,7 @@ fn main(){
             Shader::new("shaders/shader.vert", "shaders/reflection.frag"),
             Shader::newGeometry("shaders/point.vert", "shaders/lamp.frag", "shaders/point.geom"),
             Shader::new("shaders/instance.vert", "shaders/lamp.frag"),
+            Shader::new("shaders/shadow.vert", "shaders/shadow.frag"),
             quadVAO,
             fbo,
             tex,
@@ -378,7 +404,9 @@ fn main(){
             cubeVAO,
             containerVAO,
             ubo,
-            ms_fbo
+            ms_fbo,
+            shadow_fbo,
+            shadow_texture
         )
 
     };
@@ -419,14 +447,15 @@ fn main(){
             let model_mat: Matrix4<f32> = Matrix4::identity();
             let view: Matrix4<f32> = camera.get_view();
             let proj: Matrix4<f32> = perspective(Deg(45.0), 800.0/600.0 as f32, 0.1, 100.0);
-
+            let lightspace_transform: Matrix4<f32> = ortho(-100.0, 100.0, -100.0, 100.0, 0.1, 100.0) * Matrix4::look_at(Point3{x:-1.0, y:10.0, z:0.0}, Point3{x:0.0, y:0.0, z:0.0}, vec3(0.0, 1.0, 0.0));
+            
             gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
             gl::BufferSubData(gl::UNIFORM_BUFFER, mem::size_of::<Matrix4<f32>>() as isize, mem::size_of::<Matrix4<f32>>() as isize, view.as_ptr() as *const c_void);
             gl::BindBuffer(gl::UNIFORM_BUFFER, 0);
 
             shaderProgram.useProgram();
             
-            shaderProgram.setUniform3f("dir_light.direction", (-0.2, -1.0, -0.3));
+            shaderProgram.setUniform3f("dir_light.direction", (1.0, -10.0, 0.0));
             shaderProgram.setUniform3f("dir_light.ambient", (0.2, 0.2, 0.2));
             shaderProgram.setUniform3f("dir_light.diffuse", (0.2, 0.2, 0.2));
             shaderProgram.setUniform3f("dir_light.specular", (0.2, 0.2, 0.2));
@@ -440,13 +469,13 @@ fn main(){
             shaderProgram.setFloat("spot_light.outerCutoff", (0.3 as f32).cos());
 
             shaderProgram.setMat4("u_model", model_mat);
+            shaderProgram.setMat4("lightspace_transform", lightspace_transform);
 
             shaderProgram.setUniform3f("camera_pos", (camera.pos.x, camera.pos.y, camera.pos.z));
 
             shaderProgram.setFloat("time", glfw.get_time() as f32);
 
-            shaderProgram.setInt("material.diffuse", 0);
-            shaderProgram.setInt("material.specular", 1);
+            shaderProgram.setInt("shadow_map", 5);
             shaderProgram.setFloat("material.shininess", 128.0);
             
             for (i, position) in light_positions.iter().enumerate(){
@@ -458,12 +487,11 @@ fn main(){
                 shaderProgram.setUniform3f(&format!("point_lights[{}].specular", i), (1.0, 1.0, 1.0));
 
                 shaderProgram.setFloat(&format!("point_lights[{}].c", i), 1.0);
-                shaderProgram.setFloat(&format!("point_lights[{}].l", i), 0.09);
-                shaderProgram.setFloat(&format!("point_lights[{}].q", i), 0.05);
+                shaderProgram.setFloat(&format!("point_lights[{}].l", i), 0.00);
+                shaderProgram.setFloat(&format!("point_lights[{}].q", i), 1.00);
             }
             
             model.draw(&shaderProgram);
-            cube_model.draw(&shaderProgram);
 
             pointShader.useProgram();
             pointShader.setMat4("u_model", model_mat);
@@ -474,11 +502,35 @@ fn main(){
             gl::DrawArraysInstanced(gl::TRIANGLES, 0, 36, 100*100*100);
 
             gl::BindVertexArray(0);
+            
+            gl::Viewport(0, 0, 1024, 1024);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, shadow_fbo);
+            gl::Clear(gl::DEPTH_BUFFER_BIT);
+            shadowShader.useProgram();
+            shadowShader.setMat4("lightspace_transform", lightspace_transform);
+
+            for position in light_positions.iter(){
+                let model = Matrix4::<f32>::from_translation(*position)*Matrix4::<f32>::from_scale(0.2);
+                shadowShader.setMat4("u_model", model);
+                
+                cube_model.draw(&shadowShader);
+            }
+
+            gl::Viewport(0, 0, 800, 600);
+            gl::BindFramebuffer(gl::FRAMEBUFFER, ms_fbo);
+
+            shaderProgram.useProgram();
+            gl::ActiveTexture(gl::TEXTURE5);
+            gl::BindTexture(gl::TEXTURE_2D, shadow_texture);
+            let model_mat: Matrix4<f32> = Matrix4::from_nonuniform_scale(100.0, 1.0, 100.0) * Matrix4::from_translation(Vector3::unit_y() * -3.0);
+            shaderProgram.setMat4("u_model", model_mat);
+
+            cube_model.draw(&shaderProgram); 
 
             gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
             gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
             gl::StencilMask(0xFF);
-            
+
             lampShader.useProgram();
 
             for position in light_positions.iter(){
