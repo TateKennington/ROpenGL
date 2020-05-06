@@ -133,9 +133,12 @@ fn main(){
         let mut shadow_texture = 0;
         gl::GenTextures(1, &mut shadow_texture);
         gl::BindTexture(gl::TEXTURE_2D, shadow_texture);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::DEPTH_COMPONENT as i32, 1024, 1024, 0, gl::DEPTH_COMPONENT, gl::FLOAT, ptr::null());
+        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::DEPTH_COMPONENT as i32, 10000, 10000, 0, gl::DEPTH_COMPONENT, gl::FLOAT, ptr::null());
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_BORDER as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_BORDER as i32);
+        gl::TexParameterfv(gl::TEXTURE_2D, gl::TEXTURE_BORDER_COLOR, &Vector4::<f32>{x:1.0, y:1.0, z:1.0, w:1.0} as *const Vector4<f32> as *const GLfloat);
         gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::TEXTURE_2D, shadow_texture, 0);
         gl::BindTexture(gl::TEXTURE_2D, 0);
 
@@ -503,7 +506,7 @@ fn main(){
 
             gl::BindVertexArray(0);
             
-            gl::Viewport(0, 0, 1024, 1024);
+            gl::Viewport(0, 0, 10000, 10000);
             gl::BindFramebuffer(gl::FRAMEBUFFER, shadow_fbo);
             gl::Clear(gl::DEPTH_BUFFER_BIT);
             shadowShader.useProgram();

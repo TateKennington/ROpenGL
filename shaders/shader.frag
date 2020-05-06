@@ -55,14 +55,28 @@ uniform PointLight point_lights[6];
 uniform Material material;
 
 vec3 calculateDirLight(DirLight dir_light, vec3 norm, vec3 view_dir, vec3 frag_pos){
+    vec3 light_dir = normalize(-dir_light.direction);
     vec4 lightspace_pos = lightspace_transform * vec4(frag_pos, 1.0);
     vec3 lightspace_coords = lightspace_pos.xyz / lightspace_pos.w;
     lightspace_coords = 0.5 * lightspace_coords + 0.5;
-    float closest_depth = texture(shadow_map, lightspace_coords.xy).r;
+    //float closest_depth = texture(shadow_map, lightspace_coords.xy).r;
     float current_depth = lightspace_coords.z;
-    float shadow = current_depth - 0.005 > closest_depth? 1.0: 0.0;
+    //float shadow = current_depth - max(0.05* (1.0-dot(norm, light_dir)), 0.005) > closest_depth? 1.0: 0.0;
+    float shadow = 0.0;
+    vec2 size = 1.0/textureSize(shadow_map, 0);
 
-    vec3 light_dir = normalize(-dir_light.direction);
+    for(int x = -1; x<=1; x++){
+        for(int y = -1; y<=1; y++){
+            float closest_depth = texture(shadow_map, lightspace_coords.xy + vec2(x, y) * size).r;
+            shadow += current_depth - 0.005 > closest_depth? 1.0: 0.0;
+        }
+    }
+
+    shadow/=9.0;
+    
+    if (lightspace_coords.z > 1.0){
+        shadow = 0.0;
+    }
 
     vec3 ambient = vec3(texture(material.texture_diffuse1, uv)) * dir_light.ambient;
 
